@@ -1,6 +1,10 @@
+import logging
+
 from fastapi import FastAPI
 
 from kandal.api.routes import auth, matches, profiles
+
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Kandal", version="0.1.0")
 app.include_router(profiles.router, prefix="/profiles", tags=["profiles"])

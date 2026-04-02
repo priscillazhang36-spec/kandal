@@ -1,8 +1,11 @@
 """State machine for SMS onboarding conversations."""
 
+import logging
 from datetime import datetime, timezone
 
 from kandal.core.supabase import get_supabase
+
+logger = logging.getLogger(__name__)
 from kandal.models.onboarding import OnboardingSession
 from kandal.questionnaire import QUESTIONS, infer_traits
 from kandal.sms import messages
@@ -191,5 +194,9 @@ def route_message(phone: str, body: str) -> str:
     else:
         reply = messages.RESTART_HINT
 
-    send_sms(phone, reply)
+    logger.info("phone=%s state=%s body=%r reply=%r", phone, state, body, reply[:80])
+    try:
+        send_sms(phone, reply)
+    except Exception as e:
+        logger.error("send_sms failed: %s", e)
     return reply

@@ -59,6 +59,7 @@ def transition_phrase() -> str:
 
 
 def format_question(question: dict) -> str:
+    """Return the full question as a single string."""
     letters = ["A", "B", "C", "D"]
     lines = [question["text"], ""]
     for i, opt in enumerate(question["options"]):

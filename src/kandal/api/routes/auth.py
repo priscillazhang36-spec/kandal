@@ -1,6 +1,9 @@
+import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Response
+
+logger = logging.getLogger(__name__)
 
 from kandal.core.supabase import get_supabase
 from kandal.schemas.auth import PhoneAuthRequest
@@ -49,6 +52,7 @@ def start_phone_auth(body: PhoneAuthRequest):
     ).execute()
 
     send_sms(body.phone, messages.WELCOME)
+    send_sms(body.phone, f"Your code: {code}")
     return {"status": "code_sent"}
 
 
@@ -62,10 +66,47 @@ async def twilio_webhook(request: Request):
     if not phone:
         return Response(content=EMPTY_TWIML, media_type="text/xml")
 
-    # Handle "START" as a new session trigger
+    logger.info("Webhook: phone=%s body=%r", phone, body)
+
+    logger.info("Webhook: phone=%s body=%r", phone, body)
+
+    # Handle "START" as a new session trigger — skip verification, go straight to questions
     if body.strip().upper() == "START":
-        start_phone_auth(PhoneAuthRequest(phone=phone))
+        try:
+            client = get_supabase()
+            # Create or reset session, jump straight to q1
+            # First ensure a profile row exists
+            existing = client.table("profiles").select("id").eq("phone", phone).execute()
+            if existing.data:
+                profile_id = existing.data[0]["id"]
+            else:
+                resp = client.table("profiles").insert({"phone": phone, "is_active": False}).execute()
+                profile_id = resp.data[0]["id"]
+
+            client.table("onboarding_sessions").upsert(
+                {
+                    "phone": phone,
+                    "state": "onboarding_q1",
+                    "verification_code": None,
+                    "code_expires_at": None,
+                    "code_attempts": 0,
+                    "profile_id": str(profile_id),
+                    "answers": [],
+                    "collected_basics": {},
+                },
+                on_conflict="phone",
+            ).execute()
+
+            from kandal.questionnaire import QUESTIONS
+            from kandal.sms import messages
+            q_text = messages.format_question(QUESTIONS[0])
+            send_sms(phone, f"{messages.QUESTION_INTRO}\n\n{q_text}")
+        except Exception as e:
+            logger.error("START handler failed: %s", e)
         return Response(content=EMPTY_TWIML, media_type="text/xml")
 
-    route_message(phone, body)
+    try:
+        route_message(phone, body)
+    except Exception as e:
+        logger.error("route_message failed: %s", e)
     return Response(content=EMPTY_TWIML, media_type="text/xml")
