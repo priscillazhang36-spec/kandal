@@ -4,8 +4,16 @@ from fastapi import APIRouter
 
 from kandal.core.supabase import get_supabase
 from kandal.schemas.match import MatchResponse
+from kandal.scripts.match import run_batch
 
 router = APIRouter()
+
+
+@router.post("/run")
+def trigger_matching():
+    """Run the batch matching pipeline. Called by Vercel cron or manually."""
+    result = run_batch()
+    return result
 
 
 @router.get("/{profile_id}", response_model=list[MatchResponse])

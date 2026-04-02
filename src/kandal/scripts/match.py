@@ -53,6 +53,7 @@ def run_batch():
         ).execute()
 
     print(f"Processed {len(user_ids)} users, found {len(matches_to_insert)} matches.")
+    return {"users_processed": len(user_ids), "matches_found": len(matches_to_insert)}
 
 
 if __name__ == "__main__":
