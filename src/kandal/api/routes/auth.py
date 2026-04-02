@@ -74,8 +74,6 @@ async def twilio_webhook(request: Request):
     if body.strip().upper() == "START":
         try:
             client = get_supabase()
-            # Create or reset session, jump straight to q1
-            # First ensure a profile row exists
             existing = client.table("profiles").select("id").eq("phone", phone).execute()
             if existing.data:
                 profile_id = existing.data[0]["id"]
@@ -102,11 +100,13 @@ async def twilio_webhook(request: Request):
             q_text = messages.format_question(QUESTIONS[0])
             send_sms(phone, f"{messages.QUESTION_INTRO}\n\n{q_text}")
         except Exception as e:
-            logger.error("START handler failed: %s", e)
+            logger.error("START handler failed: %s", e, exc_info=True)
+            return Response(content=f"error: {e}", media_type="text/plain", status_code=500)
         return Response(content=EMPTY_TWIML, media_type="text/xml")
 
     try:
         route_message(phone, body)
     except Exception as e:
-        logger.error("route_message failed: %s", e)
+        logger.error("route_message failed: %s", e, exc_info=True)
+        return Response(content=f"error: {e}", media_type="text/plain", status_code=500)
     return Response(content=EMPTY_TWIML, media_type="text/xml")
