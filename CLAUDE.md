@@ -97,3 +97,7 @@ SUPABASE_KEY=         # Supabase service role key (for backend use)
 - **No real-time agents yet:** The "agent" is a scoring function. Will evolve into an actual agent (with negotiation protocol, external agent support) once scoring is validated.
 - **Batch over real-time:** Matching runs as a script, not a background worker. Can become a cron job or periodic task later.
 - **Scoring is a pure function:** No side effects, no DB calls. Takes two profiles, returns a score. This is the core IP — keep it testable and iteratable.
+
+## Activity Log
+
+After every commit, update `activity_log.md` at the project root to reflect what was built or changed. Keep entries concise and organized by phase. This is the living record of project progress.
