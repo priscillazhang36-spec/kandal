@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""
+    anthropic_api_key: str = ""
+    voyageai_api_key: str = ""
 
     model_config = {"env_file": ".env"}
 

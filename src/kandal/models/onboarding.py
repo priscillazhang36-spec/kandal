@@ -14,5 +14,6 @@ class OnboardingSession(BaseModel):
     profile_id: UUID | None = None
     answers: list[int] = []
     collected_basics: dict = {}
+    conversation_id: UUID | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## General Guidance
+
+- Think before acting, Read existing files before writing code.
+- Be concise in output but thorough in reasoning.
+- Prefer editing over rewriting whole files.
+- Do not re-read files you have already read.
+- Test your code before declaring done.
+- No Sycophantic openers or closing fluff.
+- Keep solutions simple and direct.
+- User instructuions always override this file
+
 ## Project Overview
 
 Kandal is an agent-mediated dating matchmaking system. Instead of swiping, users configure preferences and an AI "agent" negotiates compatibility with other agents on their behalf via a blind protocol. Only mutual matches are surfaced.
@@ -70,6 +81,7 @@ Matches are written to Supabase as `matches` rows with a compatibility summary.
 ### API Layer
 
 Thin FastAPI layer for CRUD:
+
 - User profiles and preferences
 - Agent configuration (dealbreakers, weighted preferences, selectivity)
 - Match results with compatibility summaries

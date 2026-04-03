@@ -14,5 +14,10 @@ class Profile(BaseModel):
     city: str | None = None
     bio: str = ""
     is_active: bool = True
+    narrative: str | None = None
+    narrative_embedding: list[float] | None = None
+    profile_version: int = 1
+    embedding_version: int = 0
+    last_significant_change: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
