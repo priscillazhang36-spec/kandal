@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS earthdistance;
 
 -- Profile extensions for narrative embeddings and versioning
 ALTER TABLE profiles ADD COLUMN narrative TEXT;
-ALTER TABLE profiles ADD COLUMN narrative_embedding vector(1024);
+ALTER TABLE profiles ADD COLUMN narrative_embedding vector(512);
 ALTER TABLE profiles ADD COLUMN profile_version INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE profiles ADD COLUMN embedding_version INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN last_significant_change TIMESTAMPTZ DEFAULT now();

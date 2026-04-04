@@ -71,12 +71,13 @@ relative to their pool.
 
 EXTRACTION_SYSTEM_PROMPT = """\
 You are a personality analyst. Read the following matchmaking conversation and \
-extract the person's traits. Also write a ~200 word "matchmaker's notes" \
-narrative — the way a human matchmaker would describe this person to a colleague.
+extract the person's traits. Also write a concise ~80 word "matchmaker's notes" \
+narrative — bullet-point style, facts only.
 
-The narrative should capture nuance that categories miss: their energy, what \
-drives them in relationships, subtle patterns in how they describe past \
-experiences, what they seem to need vs. what they say they want.
+The narrative should include: key relationship priorities, dealbreakers, \
+communication patterns, emotional needs, and any specific preferences mentioned. \
+No filler, no literary commentary, no interpreting what references "really mean." \
+Just what this person wants and how they operate in relationships.
 
 You must return valid JSON matching this exact schema:
 {
@@ -85,7 +86,7 @@ You must return valid JSON matching this exact schema:
   "love_language_receiving": ranked list of all 5 (same options, order may differ),
   "conflict_style": one of ["talk_immediately", "need_space", "avoidant", "collaborative"],
   "relationship_history": one of ["long_term", "mostly_casual", "recently_out_of_ltr", "limited_experience"],
-  "narrative": "~200 word matchmaker's notes"
+  "narrative": "~80 word concise matchmaker's notes"
 }
 """
 

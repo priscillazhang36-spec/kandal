@@ -13,7 +13,7 @@ from kandal.core.supabase import get_supabase
 logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL = "voyage-3-lite"
-EMBEDDING_DIM = 1024
+EMBEDDING_DIM = 512
 
 
 def _get_client() -> voyageai.Client:
