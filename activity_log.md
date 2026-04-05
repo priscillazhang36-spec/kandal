@@ -48,6 +48,16 @@
 - **Production URL** — `https://kandal.vercel.app`
 - **Twilio webhook** — Points to `https://kandal.vercel.app/sms/webhook`
 
+## Phase 5: Landing Page
+**What:** Built a public-facing landing page at kandal.app for user acquisition.
+
+- **Poke.com-inspired design** — Dark theme, JetBrains Mono typography, amber accent, full-viewport sections (`public/index.html`)
+- **Sections** — Hero ("Dating, decoded."), How It Works (3 steps), Value Props (anti-dating app), Phone signup CTA
+- **Phone registration form** — Collects phone number, calls `POST /auth/start`, triggers SMS onboarding flow
+- **Vercel routing** — Static landing page served at `/`, all API routes unchanged (`vercel.json`)
+- **Mobile-first responsive** — Stacked layout on mobile, 3-column grid on desktop
+- **Domain** — kandal.app purchased (Squarespace)
+
 ## Current State
 
 | Component | Status |
@@ -57,6 +67,7 @@
 | Scoring engine (9 dimensions) | Complete |
 | Batch matching | Runs daily + on-demand via API |
 | Vercel deployment | Live with auto-deploy |
+| Landing page | Live at kandal.app |
 | Match notifications | Not yet built |
 | Second test user | Needed to test matching |
 
