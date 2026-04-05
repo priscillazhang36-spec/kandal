@@ -3,547 +3,240 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>kandal - dating, decoded</title>
-  <meta name="description" content="An AI matchmaker that gets to know you through conversation. No swiping. No endless scrolling. Just real connection.">
+  <title>kandal</title>
+  <meta name="description" content="An AI matchmaker that gets to know you through text.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    :root {
-      --bg: #0a0a0a;
-      --bg-elevated: #141414;
-      --bg-card: #1a1a1a;
-      --text: rgba(255, 255, 255, 0.92);
-      --text-muted: rgba(255, 255, 255, 0.55);
-      --accent: #e8a838;
-      --accent-hover: #f0b848;
-      --accent-glow: rgba(232, 168, 56, 0.15);
-      --mono: 'JetBrains Mono', monospace;
-      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      line-height: 1.6;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #000; color: #f5ead6;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* Animated gradient background */
+    .bg {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 0;
+      background: #0f0c15;
+      overflow: hidden;
+    }
+
+    .orb {
+      position: absolute; border-radius: 50%;
+    }
+
+    .orb-1 {
+      width: 600px; height: 600px;
+      background: #3a6e9e;
+      opacity: 0.25;
+      top: -15%; right: -10%;
+      filter: blur(120px);
+      animation: float1 12s ease-in-out infinite;
+    }
+
+    .orb-2 {
+      width: 600px; height: 600px;
+      background: #f0923a;
+      opacity: 0.35;
+      bottom: -15%; left: -10%;
+      filter: blur(110px);
+      animation: float2 14s ease-in-out infinite;
+    }
+
+    .orb-3 {
+      width: 350px; height: 350px;
+      background: #5b8ebf;
+      opacity: 0.15;
+      top: 40%; left: 30%;
+      filter: blur(100px);
+      animation: float3 18s ease-in-out infinite;
+    }
+
+    @keyframes float1 {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-50px, 40px); }
+    }
+
+    @keyframes float2 {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(200px, -150px); }
+      50% { transform: translate(350px, -250px); }
+      75% { transform: translate(150px, -100px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    @keyframes float3 {
+      0%, 100% { transform: translate(0, 0); }
+      33% { transform: translate(30px, -30px); }
+      66% { transform: translate(-20px, 20px); }
+    }
+
+    .orb-4 {
+      width: 300px; height: 300px;
+      background: #f5a640;
+      opacity: 0.2;
+      top: 10%; left: 50%;
+      filter: blur(90px);
+      animation: float4 20s ease-in-out infinite;
+    }
+
+    @keyframes float4 {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(-250px, 150px); }
+      50% { transform: translate(-100px, 300px); }
+      75% { transform: translate(100px, 100px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    /* Content */
+    .page {
+      position: relative; z-index: 1;
+      min-height: 100vh; display: flex; flex-direction: column;
     }
 
     /* Nav */
     nav {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1.25rem 2rem;
-      background: rgba(10, 10, 10, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 2.5rem;
     }
 
     .logo {
-      font-family: var(--mono);
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text);
-      text-decoration: none;
-      letter-spacing: -0.02em;
+      font-size: 1.15rem; font-weight: 700; letter-spacing: -0.03em;
+      color: #f5ead6; text-decoration: none;
     }
 
-    .nav-cta {
-      font-family: var(--mono);
-      font-size: 0.8rem;
-      font-weight: 500;
-      color: var(--bg);
-      background: var(--accent);
-      border: none;
-      padding: 0.6rem 1.25rem;
-      border-radius: 6px;
-      cursor: pointer;
-      text-decoration: none;
-      transition: background 0.2s;
-    }
-
-    .nav-cta:hover {
-      background: var(--accent-hover);
-    }
-
-    /* Sections */
-    section {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 6rem 2rem;
-    }
-
-    /* Hero */
-    .hero {
+    /* Main */
+    main {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem 2rem 4rem;
       text-align: center;
-      max-width: 720px;
-      margin: 0 auto;
     }
 
-    .hero h1 {
-      font-family: var(--mono);
-      font-size: clamp(2.5rem, 6vw, 4.5rem);
-      font-weight: 700;
-      line-height: 1.1;
-      letter-spacing: -0.03em;
-      margin-bottom: 1.5rem;
-    }
-
-    .hero h1 span {
-      color: var(--accent);
-    }
-
-    .hero p {
-      font-size: clamp(1rem, 2.5vw, 1.25rem);
-      color: var(--text-muted);
-      max-width: 520px;
-      margin: 0 auto 2.5rem;
-      line-height: 1.7;
-    }
-
-    .hero-cta {
-      font-family: var(--mono);
-      font-size: 0.95rem;
-      font-weight: 500;
-      color: var(--bg);
-      background: var(--accent);
-      border: none;
-      padding: 0.9rem 2rem;
-      border-radius: 8px;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all 0.2s;
-      display: inline-block;
-    }
-
-    .hero-cta:hover {
-      background: var(--accent-hover);
-      transform: translateY(-1px);
-    }
-
-    .scroll-hint {
-      position: absolute;
-      bottom: 2rem;
-      left: 50%;
-      transform: translateX(-50%);
-      color: var(--text-muted);
-      font-size: 0.75rem;
-      font-family: var(--mono);
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 0.8; }
-    }
-
-    /* How It Works */
-    #how-it-works {
-      background: var(--bg-elevated);
-    }
-
-    .section-label {
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
+    .tagline {
+      font-size: clamp(1.6rem, 4vw, 2.8rem);
+      font-weight: 600; letter-spacing: -0.03em;
+      line-height: 1.3; max-width: 520px;
       margin-bottom: 1rem;
     }
 
-    .section-title {
-      font-family: var(--mono);
-      font-size: clamp(1.75rem, 4vw, 2.5rem);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 3.5rem;
-      text-align: center;
-    }
-
-    .steps {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 2rem;
-      max-width: 900px;
-      width: 100%;
-    }
-
-    .step {
-      background: var(--bg-card);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 12px;
-      padding: 2rem;
-      transition: border-color 0.2s;
-    }
-
-    .step:hover {
-      border-color: rgba(232, 168, 56, 0.25);
-    }
-
-    .step-number {
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--accent);
-      margin-bottom: 0.75rem;
-    }
-
-    .step h3 {
-      font-family: var(--mono);
-      font-size: 1.2rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-    }
-
-    .step p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }
-
-    /* Value Props */
-    .values {
-      max-width: 640px;
-      text-align: center;
-    }
-
-    .values .section-title {
-      margin-bottom: 2rem;
-    }
-
-    .value-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 1.75rem;
-      text-align: left;
-    }
-
-    .value-list li {
-      display: flex;
-      gap: 1rem;
-      align-items: flex-start;
-    }
-
-    .value-icon {
-      flex-shrink: 0;
-      width: 36px;
-      height: 36px;
-      background: var(--accent-glow);
-      border: 1px solid rgba(232, 168, 56, 0.2);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1rem;
-      color: var(--accent);
-    }
-
-    .value-list h4 {
-      font-family: var(--mono);
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 0.25rem;
-    }
-
-    .value-list p {
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      line-height: 1.5;
-    }
-
-    /* CTA Section */
-    #signup {
-      background: var(--bg-elevated);
-    }
-
-    .cta-box {
-      max-width: 480px;
-      width: 100%;
-      text-align: center;
-    }
-
-    .cta-box .section-title {
-      margin-bottom: 1rem;
-    }
-
-    .cta-box > p {
-      color: var(--text-muted);
+    .sub {
+      font-size: clamp(0.9rem, 1.8vw, 1.05rem);
+      color: rgba(245, 234, 214, 0.6);
+      line-height: 1.7; max-width: 400px;
       margin-bottom: 2.5rem;
-      font-size: 1rem;
     }
+
+    /* Phone form */
+    .signup { width: 100%; max-width: 360px; }
 
     .phone-form {
-      display: flex;
-      gap: 0.75rem;
-      margin-bottom: 1rem;
+      display: flex; gap: 0.5rem; margin-bottom: 0.6rem;
     }
 
-    .phone-input-wrap {
-      flex: 1;
-      position: relative;
-    }
+    .phone-input-wrap { flex: 1; position: relative; }
 
     .phone-prefix {
-      position: absolute;
-      left: 1rem;
-      top: 50%;
-      transform: translateY(-50%);
-      font-family: var(--mono);
-      font-size: 0.95rem;
-      color: var(--text-muted);
-      pointer-events: none;
+      position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%);
+      font-size: 0.9rem; font-weight: 500;
+      color: rgba(245, 234, 214, 0.35); pointer-events: none;
     }
 
     .phone-input {
-      width: 100%;
-      font-family: var(--mono);
-      font-size: 0.95rem;
-      color: var(--text);
-      background: var(--bg-card);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      padding: 0.9rem 1rem 0.9rem 2.75rem;
-      outline: none;
-      transition: border-color 0.2s;
+      width: 100%; font-family: inherit; font-size: 0.9rem;
+      color: #f5ead6; background: rgba(245, 234, 214, 0.08);
+      border: 1px solid rgba(245, 234, 214, 0.12);
+      border-radius: 10px; padding: 0.75rem 0.9rem 0.75rem 2.5rem;
+      outline: none; transition: all 0.15s;
     }
-
     .phone-input:focus {
-      border-color: var(--accent);
+      border-color: rgba(245, 234, 214, 0.3);
+      background: rgba(245, 234, 214, 0.12);
     }
-
-    .phone-input::placeholder {
-      color: rgba(255, 255, 255, 0.25);
-    }
+    .phone-input::placeholder { color: rgba(245, 234, 214, 0.25); }
 
     .submit-btn {
-      font-family: var(--mono);
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--bg);
-      background: var(--accent);
-      border: none;
-      padding: 0.9rem 1.75rem;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
+      font-family: inherit; font-size: 0.9rem; font-weight: 600;
+      color: #0f0c15; background: #f5ead6; border: none;
+      padding: 0.75rem 1.5rem; border-radius: 10px;
+      cursor: pointer; transition: all 0.2s; white-space: nowrap;
     }
-
-    .submit-btn:hover {
-      background: var(--accent-hover);
-    }
-
-    .submit-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
+    .submit-btn:hover { opacity: 0.85; }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .form-hint {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      font-family: var(--mono);
+      font-size: 0.7rem; color: rgba(245, 234, 214, 0.3);
     }
 
     .form-message {
-      margin-top: 1.5rem;
-      padding: 1rem 1.25rem;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-family: var(--mono);
-      display: none;
+      margin-top: 1rem; padding: 0.75rem 1rem;
+      border-radius: 10px; font-size: 0.85rem; display: none;
     }
-
     .form-message.success {
-      display: block;
-      background: rgba(72, 187, 120, 0.1);
-      border: 1px solid rgba(72, 187, 120, 0.25);
-      color: #68d391;
+      display: block; background: rgba(245, 234, 214, 0.08);
+      border: 1px solid rgba(245, 234, 214, 0.15); color: rgba(245, 234, 214, 0.8);
     }
-
     .form-message.error {
-      display: block;
-      background: rgba(245, 101, 101, 0.1);
-      border: 1px solid rgba(245, 101, 101, 0.25);
-      color: #fc8181;
+      display: block; background: rgba(255, 80, 80, 0.08);
+      border: 1px solid rgba(255, 80, 80, 0.2); color: rgba(255, 120, 120, 0.9);
     }
 
     /* Footer */
     footer {
-      padding: 2rem;
-      text-align: center;
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      position: relative; z-index: 1;
+      padding: 1.5rem 2.5rem;
+      display: flex; justify-content: center;
     }
-
-    footer p {
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
+    footer p { font-size: 0.7rem; color: rgba(245, 234, 214, 0.2); }
 
     /* Responsive */
-    @media (min-width: 640px) {
-      .steps {
-        grid-template-columns: repeat(3, 1fr);
-      }
-
-      .phone-form {
-        flex-direction: row;
-      }
-    }
-
-    @media (max-width: 639px) {
-      nav {
-        padding: 1rem 1.25rem;
-      }
-
-      section {
-        padding: 5rem 1.25rem;
-      }
-
-      .phone-form {
-        flex-direction: column;
-      }
-
-      .submit-btn {
-        width: 100%;
-      }
+    @media (max-width: 640px) {
+      nav { padding: 1.25rem 1.25rem; }
+      main { padding: 2rem 1.25rem 3rem; }
+      .phone-form { flex-direction: column; }
+      .submit-btn { width: 100%; }
     }
   </style>
 </head>
 <body>
 
-  <!-- Nav -->
-  <nav>
-    <a href="/" class="logo">kandal</a>
-    <a href="#signup" class="nav-cta">Get Started</a>
-  </nav>
+  <div class="bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+  </div>
 
-  <!-- Hero -->
-  <section class="hero" style="position: relative;">
-    <div>
-      <h1>Dating, <span>decoded.</span></h1>
-      <p>An AI matchmaker that gets to know you through conversation. No swiping. No endless scrolling. Just real connection.</p>
-      <a href="#signup" class="hero-cta">Start with a text</a>
-    </div>
-    <div class="scroll-hint">scroll</div>
-  </section>
+  <div class="page">
+    <nav>
+      <a href="/" class="logo">kandal</a>
+    </nav>
 
-  <!-- How It Works -->
-  <section id="how-it-works">
-    <span class="section-label">How it works</span>
-    <h2 class="section-title">Three texts to your next great date</h2>
-    <div class="steps">
-      <div class="step">
-        <div class="step-number">01</div>
-        <h3>Enter your number</h3>
-        <p>Drop your phone number and we'll text you. No app to download, no profile to build.</p>
+    <main>
+      <h1 class="tagline">The matchmaker that lives in your texts</h1>
+      <p class="sub">One text. One conversation. Someone worth falling for.</p>
+
+      <div class="signup" id="signup">
+        <form class="phone-form" id="signup-form">
+          <div class="phone-input-wrap">
+            <span class="phone-prefix">+1</span>
+            <input type="tel" inputmode="tel" class="phone-input" id="phone"
+              placeholder="Your number" autocomplete="tel-national" required>
+          </div>
+          <button type="submit" class="submit-btn" id="submit-btn">Text me</button>
+        </form>
+        <p class="form-hint">We'll text you to get started.</p>
+        <div class="form-message" id="form-message"></div>
       </div>
-      <div class="step">
-        <div class="step-number">02</div>
-        <h3>Chat naturally</h3>
-        <p>Our AI asks you a few questions over text. Be yourself — it's a conversation, not a questionnaire.</p>
-      </div>
-      <div class="step">
-        <div class="step-number">03</div>
-        <h3>Get matched</h3>
-        <p>Your AI agent finds people who are genuinely compatible. Only mutual matches are surfaced.</p>
-      </div>
-    </div>
-  </section>
+    </main>
 
-  <!-- Value Props -->
-  <section id="why">
-    <div class="values">
-      <span class="section-label">Why kandal</span>
-      <h2 class="section-title">The anti-dating app</h2>
-      <ul class="value-list">
-        <li>
-          <div class="value-icon">&times;</div>
-          <div>
-            <h4>No swiping</h4>
-            <p>Stop reducing people to a photo and a bio. Your AI agent evaluates compatibility on what actually matters.</p>
-          </div>
-        </li>
-        <li>
-          <div class="value-icon">&bull;</div>
-          <div>
-            <h4>Lives in your texts</h4>
-            <p>No new app to check. Kandal works through SMS — the simplest interface you already use every day.</p>
-          </div>
-        </li>
-        <li>
-          <div class="value-icon">&rarr;</div>
-          <div>
-            <h4>Quality over quantity</h4>
-            <p>Instead of hundreds of shallow options, get a few matches that are actually worth your time.</p>
-          </div>
-        </li>
-        <li>
-          <div class="value-icon">&hearts;</div>
-          <div>
-            <h4>Blind until it's mutual</h4>
-            <p>Agents negotiate compatibility behind the scenes. You only hear about it when both sides match.</p>
-          </div>
-        </li>
-      </ul>
-    </div>
-  </section>
-
-  <!-- Signup CTA -->
-  <section id="signup">
-    <div class="cta-box">
-      <span class="section-label">Get started</span>
-      <h2 class="section-title">Ready to meet someone?</h2>
-      <p>Enter your phone number and we'll text you to get started. Takes about 5 minutes.</p>
-
-      <form class="phone-form" id="signup-form">
-        <div class="phone-input-wrap">
-          <span class="phone-prefix">+1</span>
-          <input
-            type="tel"
-            inputmode="tel"
-            class="phone-input"
-            id="phone"
-            placeholder="(555) 123-4567"
-            autocomplete="tel-national"
-            required
-          >
-        </div>
-        <button type="submit" class="submit-btn" id="submit-btn">Start</button>
-      </form>
-      <p class="form-hint">US numbers only for now. We'll text you a verification code.</p>
-
-      <div class="form-message" id="form-message"></div>
-    </div>
-  </section>
-
-  <!-- Footer -->
-  <footer>
-    <p>kandal &copy; 2026</p>
-  </footer>
+    <footer><p>kandal &copy; 2026</p></footer>
+  </div>
 
   <script>
     const form = document.getElementById('signup-form');
@@ -556,28 +249,18 @@
       messageDiv.className = 'form-message ' + type;
     }
 
-    function clearMessage() {
-      messageDiv.className = 'form-message';
-      messageDiv.textContent = '';
-    }
-
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      clearMessage();
+      messageDiv.className = 'form-message';
 
-      // Normalize: strip non-digits, prepend +1
       const digits = phoneInput.value.replace(/\D/g, '');
       if (digits.length < 10 || digits.length > 11) {
-        showMessage('Please enter a valid 10-digit phone number.', 'error');
-        return;
+        return showMessage('Please enter a valid 10-digit phone number.', 'error');
       }
 
       const phone = '+1' + digits.slice(-10);
-
-      // Validate E.164
       if (!/^\+[1-9]\d{1,14}$/.test(phone)) {
-        showMessage('Please enter a valid phone number.', 'error');
-        return;
+        return showMessage('Please enter a valid phone number.', 'error');
       }
 
       submitBtn.disabled = true;
@@ -590,21 +273,18 @@
           body: JSON.stringify({ phone }),
         });
 
-        if (res.ok) {
-          showMessage('Check your texts! We just sent you a verification code.', 'success');
-          form.style.display = 'none';
-        } else if (res.status === 429) {
-          showMessage('We already sent you a code — check your texts!', 'success');
+        if (res.ok || res.status === 429) {
+          showMessage('Check your texts.', 'success');
           form.style.display = 'none';
         } else {
-          showMessage('Something went wrong. Please try again.', 'error');
+          showMessage('Something went wrong. Try again.', 'error');
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Start';
+          submitBtn.textContent = 'Text me';
         }
       } catch {
-        showMessage('Network error. Please try again.', 'error');
+        showMessage('Network error. Try again.', 'error');
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Start';
+        submitBtn.textContent = 'Text me';
       }
     });
   </script>
