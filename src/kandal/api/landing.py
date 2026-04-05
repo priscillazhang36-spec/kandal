@@ -1,0 +1,284 @@
+LANDING_HTML = r'''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>kandal</title>
+  <meta name="description" content="An AI matchmaker that gets to know you through text.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #000; color: #f5ead6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    .bg {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 0;
+      background: #0f0c15;
+      overflow: hidden;
+    }
+
+    .orb { position: absolute; border-radius: 50%; }
+
+    .orb-1 {
+      width: 600px; height: 600px;
+      background: #3a6e9e;
+      opacity: 0.25;
+      top: -15%; right: -10%;
+      filter: blur(120px);
+      animation: float1 12s ease-in-out infinite;
+    }
+
+    .orb-2 {
+      width: 600px; height: 600px;
+      background: #f0923a;
+      opacity: 0.35;
+      bottom: -15%; left: -10%;
+      filter: blur(110px);
+      animation: float2 14s ease-in-out infinite;
+    }
+
+    .orb-3 {
+      width: 350px; height: 350px;
+      background: #5b8ebf;
+      opacity: 0.15;
+      top: 40%; left: 30%;
+      filter: blur(100px);
+      animation: float3 18s ease-in-out infinite;
+    }
+
+    .orb-4 {
+      width: 300px; height: 300px;
+      background: #f5a640;
+      opacity: 0.2;
+      top: 10%; left: 50%;
+      filter: blur(90px);
+      animation: float4 20s ease-in-out infinite;
+    }
+
+    @keyframes float1 {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-50px, 40px); }
+    }
+
+    @keyframes float2 {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(200px, -150px); }
+      50% { transform: translate(350px, -250px); }
+      75% { transform: translate(150px, -100px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    @keyframes float3 {
+      0%, 100% { transform: translate(0, 0); }
+      33% { transform: translate(30px, -30px); }
+      66% { transform: translate(-20px, 20px); }
+    }
+
+    @keyframes float4 {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(-250px, 150px); }
+      50% { transform: translate(-100px, 300px); }
+      75% { transform: translate(100px, 100px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    .page {
+      position: relative; z-index: 1;
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 2.5rem;
+    }
+
+    .logo {
+      font-size: 1.15rem; font-weight: 700; letter-spacing: -0.03em;
+      color: #f5ead6; text-decoration: none;
+    }
+
+    main {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem 2rem 4rem;
+      text-align: center;
+    }
+
+    .tagline {
+      font-size: clamp(1.6rem, 4vw, 2.8rem);
+      font-weight: 600; letter-spacing: -0.03em;
+      line-height: 1.3; max-width: 520px;
+      margin-bottom: 1rem;
+    }
+
+    .sub {
+      font-size: clamp(0.9rem, 1.8vw, 1.05rem);
+      color: rgba(245, 234, 214, 0.6);
+      line-height: 1.7; max-width: 400px;
+      margin-bottom: 2.5rem;
+    }
+
+    .signup { width: 100%; max-width: 360px; }
+
+    .phone-form {
+      display: flex; gap: 0.5rem; margin-bottom: 0.6rem;
+    }
+
+    .phone-input-wrap { flex: 1; position: relative; }
+
+    .phone-prefix {
+      position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%);
+      font-size: 0.9rem; font-weight: 500;
+      color: rgba(245, 234, 214, 0.35); pointer-events: none;
+    }
+
+    .phone-input {
+      width: 100%; font-family: inherit; font-size: 0.9rem;
+      color: #f5ead6; background: rgba(245, 234, 214, 0.08);
+      border: 1px solid rgba(245, 234, 214, 0.12);
+      border-radius: 10px; padding: 0.75rem 0.9rem 0.75rem 2.5rem;
+      outline: none; transition: all 0.15s;
+    }
+    .phone-input:focus {
+      border-color: rgba(245, 234, 214, 0.3);
+      background: rgba(245, 234, 214, 0.12);
+    }
+    .phone-input::placeholder { color: rgba(245, 234, 214, 0.25); }
+
+    .submit-btn {
+      font-family: inherit; font-size: 0.9rem; font-weight: 600;
+      color: #0f0c15; background: #f5ead6; border: none;
+      padding: 0.75rem 1.5rem; border-radius: 10px;
+      cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .submit-btn:hover { opacity: 0.85; }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .form-hint {
+      font-size: 0.7rem; color: rgba(245, 234, 214, 0.3);
+    }
+
+    .form-message {
+      margin-top: 1rem; padding: 0.75rem 1rem;
+      border-radius: 10px; font-size: 0.85rem; display: none;
+    }
+    .form-message.success {
+      display: block; background: rgba(245, 234, 214, 0.08);
+      border: 1px solid rgba(245, 234, 214, 0.15); color: rgba(245, 234, 214, 0.8);
+    }
+    .form-message.error {
+      display: block; background: rgba(255, 80, 80, 0.08);
+      border: 1px solid rgba(255, 80, 80, 0.2); color: rgba(255, 120, 120, 0.9);
+    }
+
+    footer {
+      position: relative; z-index: 1;
+      padding: 1.5rem 2.5rem;
+      display: flex; justify-content: center;
+    }
+    footer p { font-size: 0.7rem; color: rgba(245, 234, 214, 0.2); }
+
+    @media (max-width: 640px) {
+      nav { padding: 1.25rem 1.25rem; }
+      main { padding: 2rem 1.25rem 3rem; }
+      .phone-form { flex-direction: column; }
+      .submit-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+  </div>
+
+  <div class="page">
+    <nav>
+      <a href="/" class="logo">kandal</a>
+    </nav>
+
+    <main>
+      <h1 class="tagline">Meet through the you that knows you best</h1>
+      <p class="sub">Kandal builds your dating alter ego -- a digital self that knows how you love, what you need, and find the match that you would really fall for.</p>
+
+      <div class="signup" id="signup">
+        <form class="phone-form" id="signup-form">
+          <div class="phone-input-wrap">
+            <span class="phone-prefix">+1</span>
+            <input type="tel" inputmode="tel" class="phone-input" id="phone"
+              placeholder="Your number" autocomplete="tel-national" required>
+          </div>
+          <button type="submit" class="submit-btn" id="submit-btn">Text me</button>
+        </form>
+        <p class="form-hint">We'll text you to get started.</p>
+        <div class="form-message" id="form-message"></div>
+      </div>
+    </main>
+
+    <footer><p>kandal &copy; 2026</p></footer>
+  </div>
+
+  <script>
+    const form = document.getElementById('signup-form');
+    const phoneInput = document.getElementById('phone');
+    const submitBtn = document.getElementById('submit-btn');
+    const messageDiv = document.getElementById('form-message');
+
+    function showMessage(text, type) {
+      messageDiv.textContent = text;
+      messageDiv.className = 'form-message ' + type;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      messageDiv.className = 'form-message';
+
+      const digits = phoneInput.value.replace(/\D/g, '');
+      if (digits.length < 10 || digits.length > 11) {
+        return showMessage('Please enter a valid 10-digit phone number.', 'error');
+      }
+
+      const phone = '+1' + digits.slice(-10);
+      if (!/^\+[1-9]\d{1,14}$/.test(phone)) {
+        return showMessage('Please enter a valid phone number.', 'error');
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+
+      try {
+        const res = await fetch('/auth/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone }),
+        });
+
+        if (res.ok || res.status === 429) {
+          showMessage('Check your texts.', 'success');
+          form.style.display = 'none';
+        } else {
+          showMessage('Something went wrong. Try again.', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Text me';
+        }
+      } catch {
+        showMessage('Network error. Try again.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Text me';
+      }
+    });
+  </script>
+
+</body>
+</html>'''
