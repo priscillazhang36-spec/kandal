@@ -221,7 +221,7 @@ LANDING_HTML = r'''<!DOCTYPE html>
           </div>
           <button type="submit" class="submit-btn" id="submit-btn">Text me</button>
         </form>
-        <p class="form-hint">We'll text you to get started.</p>
+        <p class="form-hint">We'll text you to start the conversation.</p>
         <div class="form-message" id="form-message"></div>
       </div>
     </main>
@@ -265,7 +265,7 @@ LANDING_HTML = r'''<!DOCTYPE html>
         });
 
         if (res.ok || res.status === 429) {
-          showMessage('Check your texts.', 'success');
+          showMessage('Check your texts! Kandal is reaching out.', 'success');
           form.style.display = 'none';
         } else {
           showMessage('Something went wrong. Try again.', 'error');

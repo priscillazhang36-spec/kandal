@@ -9,7 +9,7 @@ from kandal.core.supabase import get_supabase
 from kandal.schemas.auth import PhoneAuthRequest
 from kandal.sms import messages
 from kandal.sms.handler import route_message
-from kandal.sms.service import generate_verification_code, code_expiry, send_sms
+from kandal.sms.service import send_sms
 
 router = APIRouter()
 
@@ -18,42 +18,82 @@ EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response/>'
 
 @router.post("/auth/start")
 def start_phone_auth(body: PhoneAuthRequest):
-    """Send a verification code via SMS. Creates or resets an onboarding session."""
+    """Start onboarding via SMS. Creates profile and begins profiling conversation."""
     client = get_supabase()
 
     # Rate limit: 60s cooldown per phone
     existing = (
         client.table("onboarding_sessions")
-        .select("created_at")
+        .select("created_at, state")
         .eq("phone", body.phone)
         .execute()
     )
     if existing.data:
         created = datetime.fromisoformat(existing.data[0]["created_at"])
         if datetime.now(timezone.utc) - created < timedelta(seconds=60):
-            raise HTTPException(429, "Please wait before requesting another code.")
+            raise HTTPException(429, "Please wait before requesting again.")
 
-    code = generate_verification_code()
-    expires = code_expiry()
+    # Create or find profile
+    profile_resp = client.table("profiles").select("id").eq("phone", body.phone).execute()
+    if profile_resp.data:
+        profile_id = profile_resp.data[0]["id"]
+    else:
+        resp = client.table("profiles").insert({"phone": body.phone, "is_active": False}).execute()
+        profile_id = resp.data[0]["id"]
 
-    # Upsert session (reset if exists)
-    client.table("onboarding_sessions").upsert(
-        {
-            "phone": body.phone,
-            "state": "awaiting_code",
-            "verification_code": code,
-            "code_expires_at": expires.isoformat(),
-            "code_attempts": 0,
-            "profile_id": None,
-            "answers": [],
-            "collected_basics": {},
-        },
-        on_conflict="phone",
-    ).execute()
+    # Try adaptive profiling, fall back to fixed questions
+    try:
+        from uuid import UUID
+        from kandal.profiling.engine import ProfilingEngine
 
-    send_sms(body.phone, messages.WELCOME)
-    send_sms(body.phone, f"Your code: {code}")
-    return {"status": "code_sent"}
+        engine = ProfilingEngine()
+        state, opening = engine.start(UUID(str(profile_id)))
+
+        conv_resp = client.table("profiling_conversations").insert({
+            "profile_id": str(profile_id),
+            "messages": state.messages,
+            "coverage": state.coverage,
+            "status": "in_progress",
+        }).execute()
+
+        client.table("onboarding_sessions").upsert(
+            {
+                "phone": body.phone,
+                "state": "adaptive_profiling",
+                "verification_code": None,
+                "code_expires_at": None,
+                "code_attempts": 0,
+                "profile_id": str(profile_id),
+                "answers": [],
+                "collected_basics": {},
+                "conversation_id": conv_resp.data[0]["id"],
+            },
+            on_conflict="phone",
+        ).execute()
+
+        send_sms(body.phone, opening)
+    except Exception as e:
+        logger.warning("Adaptive profiling unavailable, falling back to fixed questions: %s", e)
+
+        client.table("onboarding_sessions").upsert(
+            {
+                "phone": body.phone,
+                "state": "onboarding_q1",
+                "verification_code": None,
+                "code_expires_at": None,
+                "code_attempts": 0,
+                "profile_id": str(profile_id),
+                "answers": [],
+                "collected_basics": {},
+            },
+            on_conflict="phone",
+        ).execute()
+
+        from kandal.questionnaire import QUESTIONS
+        q_text = messages.format_question(QUESTIONS[0])
+        send_sms(body.phone, f"Hey! Welcome to Kandal.\n\n{messages.QUESTION_INTRO}\n\n{q_text}")
+
+    return {"status": "started"}
 
 
 @router.post("/sms/webhook")
