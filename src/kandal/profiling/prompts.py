@@ -55,8 +55,11 @@ You have up to {max_questions} questions. You've asked {questions_asked} so far.
 Current trait coverage (0 = unknown, 1 = confident):
 {coverage_summary}
 
-Focus your next question on the least-covered dimension. If all dimensions are \
-above 0.7 confidence, wrap up the conversation warmly.
+Focus your next question on the least-covered dimension.
+
+IMPORTANT: Always end your message with a question. Never write closing messages, \
+goodbyes, or summaries like "I have what I need" or "Talk soon." The system will \
+handle the conversation ending — your job is only to ask questions.
 {pool_section}\
 """
 
