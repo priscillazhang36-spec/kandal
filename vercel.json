@@ -7,7 +7,7 @@
   ],
   "routes": [
     {
-      "src": "^/(profiles|matches|auth|sms|health)(.*)",
+      "src": "/(.*)",
       "dest": "api/index.py"
     }
   ],
