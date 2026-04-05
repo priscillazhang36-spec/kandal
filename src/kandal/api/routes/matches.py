@@ -16,6 +16,13 @@ def trigger_matching():
     return result
 
 
+@router.post("/rescue")
+def rescue_conversations():
+    """Rescue abandoned profiling conversations. Called by Vercel cron or manually."""
+    from kandal.profiling.rescue import rescue_stale_conversations
+    return rescue_stale_conversations()
+
+
 @router.get("/{profile_id}", response_model=list[MatchResponse])
 def get_matches(profile_id: UUID):
     """Get all matches for a user (appears as either profile_a or profile_b)."""
