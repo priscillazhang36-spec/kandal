@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from datetime import date
 
 import anthropic
 
@@ -21,6 +23,147 @@ from kandal.profiling.prompts import (
 from kandal.questionnaire.inference import InferredTraits
 
 logger = logging.getLogger(__name__)
+
+_MONTH_NAMES = {
+    "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3,
+    "apr": 4, "april": 4, "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
+    "aug": 8, "august": 8, "sep": 9, "september": 9, "oct": 10, "october": 10,
+    "nov": 11, "november": 11, "dec": 12, "december": 12,
+}
+
+_TIME_WORDS = {
+    "early morning": "03:00-06:00", "dawn": "05:00-08:00",
+    "morning": "06:00-09:00", "late morning": "09:00-12:00",
+    "noon": "11:00-14:00", "midday": "11:00-14:00",
+    "afternoon": "12:00-15:00", "late afternoon": "15:00-18:00",
+    "evening": "18:00-21:00",
+    "night": "21:00-00:00", "late night": "23:00-02:00",
+    "midnight": "23:00-02:00",
+}
+
+
+def _normalize_birth_date(raw: str | None) -> str | None:
+    """Best-effort normalization of a birth date string to ISO YYYY-MM-DD.
+
+    Handles: "2000-03-28", "March 28, 2000", "28/03/2000", "03/28/2000",
+    "Nov 28 2000", "YYYY-11-28" (malformed), "28 november 2000", etc.
+    Returns None if unparseable or clearly invalid.
+    """
+    if not raw or not isinstance(raw, str):
+        return None
+
+    raw = raw.strip()
+
+    # Already valid ISO?
+    try:
+        date.fromisoformat(raw)
+        return raw
+    except ValueError:
+        pass
+
+    # Strip placeholder year markers
+    if "YYYY" in raw.upper():
+        return None  # year unknown — can't use
+
+    # Try common patterns
+    cleaned = raw.replace(",", " ").replace("/", " ").replace("-", " ").replace(".", " ")
+    parts = cleaned.split()
+
+    year, month, day = None, None, None
+
+    for part in parts:
+        part_lower = part.lower().strip()
+        if part_lower in _MONTH_NAMES:
+            month = _MONTH_NAMES[part_lower]
+        elif part.isdigit():
+            n = int(part)
+            if n > 1900:
+                year = n
+            elif n > 31:
+                year = n + 2000 if n < 100 else None
+            elif month is None and day is None and n <= 12:
+                # Ambiguous — could be month or day, defer
+                if day is not None:
+                    month = n
+                else:
+                    # First number: could be month (US) or day (EU)
+                    day = n
+            elif n <= 31:
+                if day is None:
+                    day = n
+                elif month is None:
+                    month = n
+
+    # Handle case where we got day but no month yet, and remaining number fits as month
+    # Re-scan for any missed digits
+    if month is None or day is None or year is None:
+        digits = [int(x) for x in re.findall(r"\d+", raw)]
+        if len(digits) >= 3:
+            # Try YYYY-MM-DD, DD-MM-YYYY, MM-DD-YYYY
+            a, b, c = digits[0], digits[1], digits[2]
+            if a > 1900:  # YYYY-MM-DD
+                year, month, day = a, b, c
+            elif c > 1900:  # DD-MM-YYYY or MM-DD-YYYY
+                year = c
+                if a > 12:  # must be DD-MM
+                    day, month = a, b
+                elif b > 12:  # must be MM-DD
+                    month, day = a, b
+                else:  # ambiguous, assume MM-DD (US)
+                    month, day = a, b
+
+    if year is None or month is None or day is None:
+        return None
+
+    try:
+        d = date(year, month, day)
+        return d.isoformat()
+    except ValueError:
+        # Try swapping month/day if out of range
+        try:
+            d = date(year, day, month)
+            return d.isoformat()
+        except ValueError:
+            return None
+
+
+def _normalize_birth_time(raw: str | None) -> str | None:
+    """Normalize birth time to 'HH:00-HH:00' 3-hour window format.
+
+    Handles: "06:00-09:00" (already valid), "morning", "5:38AM",
+    "around 5am", "early morning", "between 3 and 6", etc.
+    Returns None if unparseable.
+    """
+    if not raw or not isinstance(raw, str):
+        return None
+
+    raw = raw.strip().lower()
+
+    # Already in HH:00-HH:00 format?
+    if re.match(r"\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}", raw):
+        return raw
+
+    # Check word-based times
+    for word, window in _TIME_WORDS.items():
+        if word in raw:
+            return window
+
+    # Try to extract a specific hour: "5:38am", "5am", "around 5", "17:00"
+    hour_match = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", raw)
+    if hour_match:
+        h = int(hour_match.group(1))
+        ampm = hour_match.group(3)
+        if ampm == "pm" and h < 12:
+            h += 12
+        elif ampm == "am" and h == 12:
+            h = 0
+        if 0 <= h <= 23:
+            # Build a 3-hour window centered on the hour
+            start = max(0, h - 1)
+            end = min(23, h + 2)
+            return f"{start:02d}:00-{end:02d}:00"
+
+    return None
 
 
 def _get_client() -> anthropic.Anthropic:
@@ -101,8 +244,8 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
     if not isinstance(cultural_prefs, list):
         cultural_prefs = None
 
-    birth_date = data.get("birth_date")  # pass through as string
-    birth_time_approx = data.get("birth_time_approx")
+    birth_date = _normalize_birth_date(data.get("birth_date"))
+    birth_time_approx = _normalize_birth_time(data.get("birth_time_approx"))
     birth_city = data.get("birth_city")
 
     # Validate dimension_weights: must be a dict with valid keys that sums to ~1.0
