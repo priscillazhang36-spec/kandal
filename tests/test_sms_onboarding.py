@@ -67,7 +67,8 @@ def test_correct_verification_code(mock_sb, mock_load, mock_save, mock_send):
 
     # May start adaptive profiling or fall back to fixed questions
     assert (
-        "alter ego" in reply
+        "glad you're here" in reply
+        or "alter ego" in reply
         or "Ready?" in reply
         or "first one" in reply
     )

@@ -28,10 +28,13 @@ DEFAULT_MAX_QUESTIONS = 14
 COVERAGE_CHECK_INTERVAL = 2
 
 OPENING_MESSAGE = (
-    "Hey! I'm going to be your dating alter ego — think of me as a version "
-    "of you that knows exactly what you want and goes out to find it. But "
-    "first, I need to really get you.\n\n"
-    "So tell me — what does an amazing relationship look like in your world?"
+    "Hi :) I'm really glad you're here.\n\n"
+    "I know this is a little different — but think of me like a friend "
+    "who just wants to understand how you work. Not the surface stuff. "
+    "The real stuff. How you love, what makes you feel safe, what you're "
+    "actually looking for.\n\n"
+    "No rush. We're just talking.\n\n"
+    "So — what's something that made you smile recently?"
 )
 
 RANKING_QUESTION = (
