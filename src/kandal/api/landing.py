@@ -89,29 +89,29 @@ LANDING_HTML = r'''<!DOCTYPE html>
 
     .signup { width: 100%; max-width: 360px; }
 
-    .phone-form { display: flex; gap: 0.5rem; margin-bottom: 0.6rem; }
-    .phone-input-wrap { flex: 1; position: relative; }
+    .phone-form { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.6rem; }
+    .phone-input-wrap { position: relative; }
     .phone-prefix {
-      position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%);
-      font-size: 0.9rem; font-weight: 500;
-      color: rgba(245,234,214,0.35); pointer-events: none;
+      position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+      font-size: 1rem; font-weight: 500;
+      color: rgba(245,234,214,0.5); pointer-events: none;
     }
     .phone-input {
       width: 100%; font-family: inherit; font-size: 1rem;
       color: #f5ead6; background: rgba(245,234,214,0.08);
-      border: 1px solid rgba(245,234,214,0.12);
-      border-radius: 10px; padding: 0.75rem 0.9rem 0.75rem 2.5rem;
+      border: 1px solid rgba(245,234,214,0.15);
+      border-radius: 10px; padding: 0.85rem 1rem 0.85rem 2.8rem;
       outline: none; transition: border-color 0.15s, background 0.15s;
       -webkit-appearance: none;
     }
     .phone-input:focus {
-      border-color: rgba(245,234,214,0.3);
+      border-color: rgba(245,234,214,0.35);
       background: rgba(245,234,214,0.12);
     }
-    .phone-input::placeholder { color: rgba(245,234,214,0.25); }
+    .phone-input::placeholder { color: rgba(245,234,214,0.3); }
 
     .form-error {
-      margin-top: 0.5rem; font-size: 0.8rem;
+      margin-top: 0.25rem; font-size: 0.8rem;
       color: rgba(255,120,120,0.9); display: none;
     }
     .form-error.visible { display: block; }
@@ -233,8 +233,6 @@ LANDING_HTML = r'''<!DOCTYPE html>
       .sub { max-width: 90%; margin-bottom: 2rem; }
       .signup { max-width: 90%; }
       footer { padding: 1.25rem 1.5rem; }
-      .phone-form { flex-direction: column; gap: 0.75rem; }
-      .start-btn { width: 100%; }
       .orb-1, .orb-2 { width: 250px; height: 250px; }
       .orb-3 { width: 150px; height: 150px; }
       .orb-4 { width: 120px; height: 120px; }
