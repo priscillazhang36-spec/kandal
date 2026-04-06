@@ -235,11 +235,7 @@ class ProfilingEngine:
             state.awaiting_confirmation = False
             traits = InferredTraits(**state.pending_traits)
 
-            # If conversation already gave us weights, finalize directly
-            if traits.dimension_weights:
-                return self._finalize(state, traits, state.pending_narrative)
-
-            # Otherwise, ask for ranking
+            # Always ask ranking so the user explicitly controls their priorities
             return self._ask_ranking(state)
 
         # User wants corrections — re-extract with correction context

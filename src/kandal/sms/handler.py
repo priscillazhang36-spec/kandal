@@ -77,7 +77,13 @@ def _finalize(session: OnboardingSession) -> None:
     if narrative:
         profile_update["narrative"] = narrative
     if traits.birth_date:
-        profile_update["birth_date"] = traits.birth_date
+        # Validate it's a real date before saving to a DATE column
+        try:
+            from datetime import date as _date
+            _date.fromisoformat(traits.birth_date)
+            profile_update["birth_date"] = traits.birth_date
+        except (ValueError, TypeError):
+            logger.warning("Invalid birth_date from extraction: %s", traits.birth_date)
     if traits.birth_time_approx:
         profile_update["birth_time_approx"] = traits.birth_time_approx
     if traits.birth_city:
