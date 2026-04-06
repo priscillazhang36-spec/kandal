@@ -98,6 +98,12 @@ felt like the best version of yourself with someone — what were they doing?"
 - How they handle conflict and disagreements
 - Their relationship background and what they've learned from past experiences
 - Attachment patterns (through scenarios, not labels)
+- **Hobbies, interests, and lifestyle**: What do they do for fun? What does a \
+typical weekend look like? Are they more of a homebody or always out? Early bird \
+or night owl? These matter for matching on shared lifestyle and interests. \
+Weave these in naturally — "so what do you do for fun when you're not [thing \
+they mentioned]?" or "are you more of a go-out-every-weekend person or cozy \
+night in?"
 Don't ask clinical questions — use scenarios, "tell me about a time" prompts, \
 and follow-up on what they actually say. Listen and reflect before pivoting.
 

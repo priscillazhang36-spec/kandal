@@ -182,6 +182,7 @@ def test_collecting_name(mock_load, mock_save, mock_send):
 @patch("kandal.sms.handler._load_session")
 def test_collecting_age_valid(mock_load, mock_save, mock_send):
     session = _make_session(state="collecting_age", profile_id=uuid4(), answers=list(range(10)))
+    session.collected_basics = {"name": "Test"}
     mock_load.return_value = session
 
     reply = route_message("+15551234567", "28")
@@ -208,6 +209,7 @@ def test_collecting_age_invalid(mock_load, mock_save, mock_send):
 @patch("kandal.sms.handler._load_session")
 def test_collecting_gender(mock_load, mock_save, mock_send):
     session = _make_session(state="collecting_gender", profile_id=uuid4(), answers=list(range(10)))
+    session.collected_basics = {"name": "Test", "age": 28}
     mock_load.return_value = session
 
     reply = route_message("+15551234567", "Female")

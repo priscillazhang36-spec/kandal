@@ -176,6 +176,60 @@ def _finalize(session: OnboardingSession) -> bool:
     return True
 
 
+def _prefill_basics_from_traits(session: OnboardingSession) -> None:
+    """Pre-fill collected_basics from profiling conversation traits to avoid re-asking."""
+    client = get_supabase()
+
+    if not session.conversation_id:
+        return
+
+    conv_resp = (
+        client.table("profiling_conversations")
+        .select("extracted_traits")
+        .eq("id", str(session.conversation_id))
+        .execute()
+    )
+    if not conv_resp.data or not conv_resp.data[0].get("extracted_traits"):
+        return
+
+    traits = conv_resp.data[0]["extracted_traits"]
+
+    # Age from birth_date
+    if traits.get("birth_date") and "age" not in session.collected_basics:
+        try:
+            from datetime import date as _date
+            bd = _date.fromisoformat(traits["birth_date"])
+            today = _date.today()
+            age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+            if 18 <= age <= 99:
+                session.collected_basics["age"] = age
+        except (ValueError, TypeError):
+            pass
+
+    # Gender preference
+    if traits.get("gender_preference") and "gender_preference" not in session.collected_basics:
+        session.collected_basics["gender_preference"] = traits["gender_preference"]
+
+
+def _next_missing_basic(session: OnboardingSession) -> tuple[str, str]:
+    """Return (next_state, prompt) for the first missing basic field."""
+    basics = session.collected_basics
+
+    if "name" not in basics:
+        return "collecting_name", messages.BASICS_INTRO
+    if "age" not in basics:
+        return "collecting_age", messages.BASICS_AGE
+    if "gender" not in basics:
+        return "collecting_gender", messages.BASICS_GENDER
+    if "gender_preference" not in basics:
+        return "collecting_gender_preference", messages.BASICS_GENDER_PREFERENCE
+    if "city" not in basics:
+        return "collecting_city", messages.BASICS_CITY
+
+    # Everything collected — finalize directly
+    return "complete", ""
+
+
 def _handle_awaiting_code(session: OnboardingSession, body: str) -> str:
     # Check expiry
     if session.code_expires_at and datetime.now(timezone.utc) > session.code_expires_at:
@@ -297,9 +351,18 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
         ).execute()
 
         if turn.is_complete:
-            session.state = "collecting_name"
+            # Pre-fill basics from extracted traits to avoid re-asking
+            _prefill_basics_from_traits(session)
+            next_state, next_prompt = _next_missing_basic(session)
+            session.state = next_state
             _save_session(session)
-            return f"{turn.reply}\n\n{messages.BASICS_INTRO}"
+            if next_state == "complete":
+                if _finalize(session):
+                    return f"{turn.reply}\n\n{messages.ONBOARDING_COMPLETE}"
+                session.state = "finalize_failed"
+                _save_session(session)
+                return f"{turn.reply}\n\n{messages.FINALIZE_FAILED}"
+            return f"{turn.reply}\n\n{next_prompt}"
 
         _save_session(session)
         return turn.reply
@@ -341,9 +404,16 @@ def _handle_collecting_name(session: OnboardingSession, body: str) -> str:
     if not name:
         return "I need a name! What should I call you?"
     session.collected_basics["name"] = name
-    session.state = "collecting_age"
+    next_state, next_prompt = _next_missing_basic(session)
+    session.state = next_state
     _save_session(session)
-    return messages.BASICS_AGE
+    if next_state == "complete":
+        if _finalize(session):
+            return messages.ONBOARDING_COMPLETE
+        session.state = "finalize_failed"
+        _save_session(session)
+        return messages.FINALIZE_FAILED
+    return next_prompt
 
 
 def _handle_collecting_age(session: OnboardingSession, body: str) -> str:
@@ -357,9 +427,16 @@ def _handle_collecting_age(session: OnboardingSession, body: str) -> str:
         return messages.BASICS_AGE_INVALID
 
     session.collected_basics["age"] = age
-    session.state = "collecting_gender"
+    next_state, next_prompt = _next_missing_basic(session)
+    session.state = next_state
     _save_session(session)
-    return messages.BASICS_GENDER
+    if next_state == "complete":
+        if _finalize(session):
+            return messages.ONBOARDING_COMPLETE
+        session.state = "finalize_failed"
+        _save_session(session)
+        return messages.FINALIZE_FAILED
+    return next_prompt
 
 
 def _handle_collecting_gender(session: OnboardingSession, body: str) -> str:
@@ -368,9 +445,16 @@ def _handle_collecting_gender(session: OnboardingSession, body: str) -> str:
         return messages.BASICS_GENDER_INVALID
 
     session.collected_basics["gender"] = cleaned
-    session.state = "collecting_gender_preference"
+    next_state, next_prompt = _next_missing_basic(session)
+    session.state = next_state
     _save_session(session)
-    return messages.BASICS_GENDER_PREFERENCE
+    if next_state == "complete":
+        if _finalize(session):
+            return messages.ONBOARDING_COMPLETE
+        session.state = "finalize_failed"
+        _save_session(session)
+        return messages.FINALIZE_FAILED
+    return next_prompt
 
 
 def _parse_gender_preference(text: str) -> list[str] | None:
@@ -389,9 +473,16 @@ def _handle_collecting_gender_preference(session: OnboardingSession, body: str) 
         return messages.BASICS_GENDER_PREFERENCE_INVALID
 
     session.collected_basics["gender_preference"] = prefs
-    session.state = "collecting_city"
+    next_state, next_prompt = _next_missing_basic(session)
+    session.state = next_state
     _save_session(session)
-    return messages.BASICS_CITY
+    if next_state == "complete":
+        if _finalize(session):
+            return messages.ONBOARDING_COMPLETE
+        session.state = "finalize_failed"
+        _save_session(session)
+        return messages.FINALIZE_FAILED
+    return next_prompt
 
 
 def _handle_collecting_city(session: OnboardingSession, body: str) -> str:
