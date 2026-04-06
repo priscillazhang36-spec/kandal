@@ -68,17 +68,20 @@ happens when things get hard though?")
 Conversation arc — follow this structure:
 
 PHASE 1 — GET TO KNOW THEM (first 3-4 exchanges):
-Start with light getting-to-know-you questions, and naturally weave in the \
-basic/factual info during this phase. This is where you collect:
-- Their birthday ("when's your birthday btw?"), birth time ("do you know \
-roughly what time you were born? morning, night, etc — even a guess works"), \
-and birthplace ("and where were you born?")
-- Who they're into ("so who catches your eye typically?") and any cultural \
-preferences — ask naturally, note without judgment
+Start with light getting-to-know-you questions, and collect ALL of the basic info \
+during this phase. You MUST ask every one of these before moving to Phase 2:
+- Their birthday ("when's your birthday btw?")
+- Birth time ("do you know roughly what time you were born? morning, night, etc — even a guess works")
+- Birthplace ("and where were you born?")
+- Who they're into ("so who catches your eye typically — guys, girls, both?")
+- Any cultural/racial preferences ("and is there a type or background you tend to go for, or pretty open?")
 These are easy, low-stakes questions that fit naturally into early small talk. \
-Get them out of the way here so the rest of the conversation can focus on the \
-deeper stuff. You can bundle 2 of these into one message if it flows naturally \
-(e.g. "oh when's your birthday? and where'd you grow up?").
+Bundle 2-3 into one message to keep it flowing (e.g. "oh when's your birthday? \
+and where'd you grow up?" or "so who catches your eye — and is there a type you \
+tend to go for?"). DO NOT move to deeper questions until all 5 basic items above \
+are collected. If a user gives you a light answer to your ice breaker, react \
+briefly and then weave in the basics — don't keep going deeper into the ice \
+breaker topic for multiple exchanges.
 
 PHASE 2 — GO DEEPER (middle exchanges):
 Now transition into the emotional/relational stuff. Use what they already told \
@@ -164,20 +167,27 @@ You are a personality analyst. Read the following matchmaking conversation and \
 extract the person's traits. Also write a concise ~80 word "matchmaker's notes" \
 narrative — bullet-point style, facts only.
 
+CRITICAL: Only extract what the person EXPLICITLY said or clearly demonstrated. \
+Do NOT infer, assume, or fill in gaps. If they never mentioned cultural preferences, \
+use null — do NOT assume "open to everyone." If they didn't clearly indicate an \
+attachment style, pick the closest match but note your confidence. The narrative \
+should only contain information the person actually shared — no assumptions, no \
+extrapolations, no "they seem like" guesses.
+
 The narrative should include: key relationship priorities, dealbreakers, \
 communication patterns, emotional needs, and any specific preferences mentioned. \
 No filler, no literary commentary, no interpreting what references "really mean." \
-Just what this person wants and how they operate in relationships.
+Just what this person said and how they described their relationship patterns.
 
 You must return valid JSON matching this exact schema:
 {
-  "attachment_style": one of ["secure", "anxious", "avoidant", "disorganized"],
-  "love_language_giving": ranked list of all 5: ["words_of_affirmation", "quality_time", "physical_touch", "acts_of_service", "gifts"],
-  "love_language_receiving": ranked list of all 5 (same options, order may differ),
-  "conflict_style": one of ["talk_immediately", "need_space", "avoidant", "collaborative"],
-  "relationship_history": one of ["long_term", "mostly_casual", "recently_out_of_ltr", "limited_experience"],
-  "gender_preference": list like ["male"] or ["female"] or ["male","female"] or ["male","female","nonbinary"] — who they're attracted to. Use null if never mentioned.,
-  "cultural_preferences": list of any cultural/racial preferences mentioned (free-form strings), or [] if open to everyone or not discussed,
+  "attachment_style": one of ["secure", "anxious", "avoidant", "disorganized"] — pick the closest match based on what they described,
+  "love_language_giving": ranked list of all 5: ["words_of_affirmation", "quality_time", "physical_touch", "acts_of_service", "gifts"] — rank based ONLY on what they described doing for others,
+  "love_language_receiving": ranked list of all 5 (same options, order may differ) — rank based ONLY on what they said they need,
+  "conflict_style": one of ["talk_immediately", "need_space", "avoidant", "collaborative"] — based on what they described doing during conflict,
+  "relationship_history": one of ["long_term", "mostly_casual", "recently_out_of_ltr", "limited_experience"] — ONLY based on what they explicitly shared about past relationships,
+  "gender_preference": list like ["male"] or ["female"] or ["male","female","nonbinary"] — ONLY if they explicitly stated who they're attracted to. Use null if never mentioned. Do NOT guess from context clues.,
+  "cultural_preferences": list of any cultural/racial preferences they EXPLICITLY mentioned, or null if never discussed. Do NOT default to "open to everyone" — if it wasn't discussed, use null.,
   "birth_date": "YYYY-MM-DD" if they shared their birthday, or null,
   "birth_time_approx": approximate birth time as "HH:00-HH:00" (3hr window) if shared — convert "morning" to "06:00-09:00", "afternoon" to "12:00-15:00", "evening" to "18:00-21:00", "night" to "21:00-00:00", "early morning" to "03:00-06:00". Use null if not shared.,
   "birth_city": city name if they shared where they were born, or null,
@@ -221,10 +231,16 @@ Write a quick summary of what you learned about them so they can confirm it's ri
 
 Tone: casual, warm — like a friend saying "ok so here's what I've got on you."
 
-Include:
+CRITICAL: Only include things the person ACTUALLY SAID or that are directly \
+supported by the extracted traits. Do NOT add information that wasn't discussed. \
+If a field is null or missing in the traits, do not mention it or make assumptions \
+about it. For example, if cultural_preferences is null, do NOT say "open to all" — \
+just don't mention it.
+
+Include (only if present in the extracted traits):
 - How they show up for someone they love — what it feels like to be with them
 - What they need to feel from a partner to be their best self
-- Who they're into (gender, any cultural preferences, or "open to all")
+- Who they're into (gender preference, cultural preferences — only if explicitly stated)
 - How they love and want to be loved
 - How they deal with conflict
 - Their relationship background
@@ -253,7 +269,7 @@ def build_conversation_prompt(
     # Tell the agent which phase it should be in based on progress
     ratio = questions_asked / max_questions if max_questions > 0 else 0
     if ratio < 0.3:
-        phase_hint = "You are in PHASE 1 (getting to know them). Focus on light questions and collecting basic info (birthday, birth time, birthplace, who they're into)."
+        phase_hint = "You are in PHASE 1. You MUST collect: birthday, birth time, birthplace, gender preference, and cultural preferences before moving to deeper questions. Bundle these naturally into your messages. Do not spend multiple exchanges on small talk without asking basics."
     elif ratio < 0.8:
         phase_hint = "You are in PHASE 2 (going deeper). Basic info should be collected by now. Focus on emotional dynamics (how they make partners feel, what they need to feel), love languages, conflict, attachment, relationship history."
     else:
@@ -297,8 +313,6 @@ def build_summary_prompt(traits: InferredTraits, narrative: str) -> str:
         parts.append(f"- Attracted to: {', '.join(traits.gender_preference)}\n")
     if traits.cultural_preferences:
         parts.append(f"- Cultural preferences: {', '.join(traits.cultural_preferences)}\n")
-    else:
-        parts.append("- Cultural preferences: open to all\n")
     if traits.birth_date:
         birth_line = f"- Birthday: {traits.birth_date}"
         if traits.birth_time_approx:
