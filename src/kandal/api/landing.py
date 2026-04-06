@@ -89,6 +89,33 @@ LANDING_HTML = r'''<!DOCTYPE html>
 
     .signup { width: 100%; max-width: 360px; }
 
+    .phone-form { display: flex; gap: 0.5rem; margin-bottom: 0.6rem; }
+    .phone-input-wrap { flex: 1; position: relative; }
+    .phone-prefix {
+      position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%);
+      font-size: 0.9rem; font-weight: 500;
+      color: rgba(245,234,214,0.35); pointer-events: none;
+    }
+    .phone-input {
+      width: 100%; font-family: inherit; font-size: 1rem;
+      color: #f5ead6; background: rgba(245,234,214,0.08);
+      border: 1px solid rgba(245,234,214,0.12);
+      border-radius: 10px; padding: 0.75rem 0.9rem 0.75rem 2.5rem;
+      outline: none; transition: border-color 0.15s, background 0.15s;
+      -webkit-appearance: none;
+    }
+    .phone-input:focus {
+      border-color: rgba(245,234,214,0.3);
+      background: rgba(245,234,214,0.12);
+    }
+    .phone-input::placeholder { color: rgba(245,234,214,0.25); }
+
+    .form-error {
+      margin-top: 0.5rem; font-size: 0.8rem;
+      color: rgba(255,120,120,0.9); display: none;
+    }
+    .form-error.visible { display: block; }
+
     .start-btn {
       font-family: inherit; font-size: 1rem; font-weight: 600;
       color: #0f0c15; background: #f5ead6; border: none;
@@ -206,6 +233,8 @@ LANDING_HTML = r'''<!DOCTYPE html>
       .sub { max-width: 90%; margin-bottom: 2rem; }
       .signup { max-width: 90%; }
       footer { padding: 1.25rem 1.5rem; }
+      .phone-form { flex-direction: column; gap: 0.75rem; }
+      .start-btn { width: 100%; }
       .orb-1, .orb-2 { width: 250px; height: 250px; }
       .orb-3 { width: 150px; height: 150px; }
       .orb-4 { width: 120px; height: 120px; }
@@ -236,9 +265,17 @@ LANDING_HTML = r'''<!DOCTYPE html>
     <main>
       <h1 class="tagline">Meet through the you that knows you best</h1>
       <p class="sub">Kandal builds your dating alter ego -- a digital self that knows how you love, what you need, and find the match that you would really fall for.</p>
-      <div class="signup">
-        <button class="start-btn" id="start-btn">Start the conversation</button>
-        <p class="form-hint">Takes about 5 minutes. No app needed.</p>
+      <div class="signup" id="signup">
+        <form class="phone-form" id="phone-form">
+          <div class="phone-input-wrap">
+            <span class="phone-prefix">+1</span>
+            <input type="tel" inputmode="tel" class="phone-input" id="phone"
+              placeholder="Your number" autocomplete="tel-national" required>
+          </div>
+          <button type="submit" class="start-btn" id="start-btn">Let's go</button>
+        </form>
+        <p class="form-hint">We'll use this to find you later. Chat happens right here.</p>
+        <div class="form-error" id="form-error"></div>
       </div>
     </main>
     <footer><p>kandal &copy; 2026</p></footer>
@@ -259,7 +296,10 @@ LANDING_HTML = r'''<!DOCTYPE html>
   </div>
 
   <script>
+    const phoneForm = document.getElementById('phone-form');
+    const phoneInput = document.getElementById('phone');
     const startBtn = document.getElementById('start-btn');
+    const formError = document.getElementById('form-error');
     const landingEl = document.getElementById('landing');
     const chatView = document.getElementById('chat-view');
     const chatMessages = document.getElementById('chat-messages');
@@ -294,7 +334,18 @@ LANDING_HTML = r'''<!DOCTYPE html>
     }
 
     // Start conversation
-    startBtn.addEventListener('click', async () => {
+    phoneForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      formError.className = 'form-error';
+
+      const digits = phoneInput.value.replace(/\D/g, '');
+      if (digits.length < 10 || digits.length > 11) {
+        formError.textContent = 'Please enter a valid 10-digit phone number.';
+        formError.className = 'form-error visible';
+        return;
+      }
+
+      const phone = '+1' + digits.slice(-10);
       startBtn.disabled = true;
       startBtn.textContent = 'Starting...';
 
@@ -302,13 +353,18 @@ LANDING_HTML = r'''<!DOCTYPE html>
         const res = await fetch('/chat/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ phone }),
         });
 
         if (!res.ok) throw new Error('Failed to start');
 
         const data = await res.json();
         sessionId = data.session_id;
+
+        // Save to localStorage for session resume
+        localStorage.setItem('kandal_session', JSON.stringify({
+          session_id: sessionId, phone
+        }));
 
         // Switch to chat view
         landingEl.style.display = 'none';
@@ -317,8 +373,9 @@ LANDING_HTML = r'''<!DOCTYPE html>
         chatInput.focus();
       } catch (e) {
         startBtn.disabled = false;
-        startBtn.textContent = 'Start the conversation';
-        alert('Something went wrong. Please try again.');
+        startBtn.textContent = "Let's go";
+        formError.textContent = 'Something went wrong. Please try again.';
+        formError.className = 'form-error visible';
       }
     });
 

@@ -1,7 +1,7 @@
 """Web chat API — replaces SMS for the profiling conversation."""
 
 import logging
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 class ChatStartRequest(BaseModel):
-    phone: str | None = None  # optional — for linking to profile later
+    phone: str  # E.164 format, e.g. "+15551234567"
 
 
 class ChatStartResponse(BaseModel):
@@ -38,9 +38,7 @@ class ChatReplyResponse(BaseModel):
 def chat_start(body: ChatStartRequest):
     """Start a web chat profiling session. Returns opening message."""
     client = get_supabase()
-
-    # Use phone if provided, otherwise generate a placeholder
-    phone = body.phone or f"web-{uuid4().hex[:12]}"
+    phone = body.phone
 
     # Create profile
     profile_resp = client.table("profiles").select("id").eq("phone", phone).execute()
