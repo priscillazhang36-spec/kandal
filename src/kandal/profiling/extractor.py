@@ -271,6 +271,15 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
     else:
         dimension_weights = None
 
+    # Emotional dynamics — the core matching signal
+    emotional_giving = data.get("emotional_giving")
+    if not isinstance(emotional_giving, str) or len(emotional_giving.strip()) < 10:
+        emotional_giving = None
+
+    emotional_needs = data.get("emotional_needs")
+    if not isinstance(emotional_needs, str) or len(emotional_needs.strip()) < 10:
+        emotional_needs = None
+
     traits = InferredTraits(
         attachment_style=attachment,
         love_language_giving=giving,
@@ -283,6 +292,8 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
         birth_time_approx=birth_time_approx,
         birth_city=birth_city,
         dimension_weights=dimension_weights,
+        emotional_giving=emotional_giving,
+        emotional_needs=emotional_needs,
     )
 
     return traits, narrative

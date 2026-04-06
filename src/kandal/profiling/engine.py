@@ -60,7 +60,7 @@ _RANK_WEIGHTS = {1: 0.35, 2: 0.25, 3: 0.20, 4: 0.12, 5: 0.08}
 # Each ranked category maps to scoring dimensions
 _CATEGORY_DIMENSIONS = {
     "A": ["interest_overlap", "personality_match", "lifestyle_signals"],
-    "B": ["attachment_style", "love_language_fit"],
+    "B": ["attachment_style", "love_language_fit", "emotional_fit"],
     "C": ["conflict_style", "communication_style"],
     "D": ["bazi_compatibility"],
     "E": ["values_alignment", "relationship_history"],

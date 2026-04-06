@@ -103,6 +103,10 @@ def _finalize(session: OnboardingSession) -> bool:
         profile_update["birth_time_approx"] = traits.birth_time_approx
     if traits.birth_city:
         profile_update["birth_city"] = traits.birth_city
+    if traits.emotional_giving:
+        profile_update["emotional_giving"] = traits.emotional_giving
+    if traits.emotional_needs:
+        profile_update["emotional_needs"] = traits.emotional_needs
 
     try:
         client.table("profiles").update(profile_update).eq(
@@ -141,15 +145,33 @@ def _finalize(session: OnboardingSession) -> bool:
         _alert_admin(f"Preferences save failed for {session.phone}: {e}")
         return False
 
-    # Generate and store embedding if we have a narrative (non-critical)
-    if narrative:
-        try:
-            from kandal.profiling.embeddings import embed_narrative, store_narrative_and_embedding
+    # Generate and store embeddings (non-critical)
+    try:
+        from kandal.profiling.embeddings import (
+            embed_emotional_dynamics,
+            embed_narrative,
+            store_narrative_and_embedding,
+        )
 
+        if narrative:
             embedding = embed_narrative(narrative)
             store_narrative_and_embedding(session.profile_id, narrative, embedding)
-        except Exception as e:
-            logger.warning("Failed to generate embedding: %s", e)
+
+        if traits.emotional_giving or traits.emotional_needs:
+            giving_emb, needs_emb = embed_emotional_dynamics(
+                traits.emotional_giving, traits.emotional_needs
+            )
+            emb_update = {}
+            if giving_emb:
+                emb_update["emotional_giving_embedding"] = giving_emb
+            if needs_emb:
+                emb_update["emotional_needs_embedding"] = needs_emb
+            if emb_update:
+                client.table("profiles").update(emb_update).eq(
+                    "id", str(session.profile_id)
+                ).execute()
+    except Exception as e:
+        logger.warning("Failed to generate embeddings: %s", e)
 
     return True
 

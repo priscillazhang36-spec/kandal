@@ -47,6 +47,10 @@ def main():
             profile_data["birth_time_approx"] = turn.traits.birth_time_approx
         if turn.traits and turn.traits.birth_city:
             profile_data["birth_city"] = turn.traits.birth_city
+        if turn.traits and turn.traits.emotional_giving:
+            profile_data["emotional_giving"] = turn.traits.emotional_giving
+        if turn.traits and turn.traits.emotional_needs:
+            profile_data["emotional_needs"] = turn.traits.emotional_needs
 
         client.table("profiles").insert(profile_data).execute()
         print("  profiles ✓")
@@ -69,7 +73,7 @@ def main():
         client.table("preferences").insert(prefs_data).execute()
         print("  preferences ✓")
 
-        # Generate and store narrative embedding
+        # Generate and store embeddings
         if turn.narrative:
             from kandal.profiling.embeddings import embed_narrative
             embedding = embed_narrative(turn.narrative)
@@ -78,6 +82,22 @@ def main():
                 "embedding_version": 1,
             }).eq("id", str(profile_id)).execute()
             print(f"  narrative_embedding ✓ ({len(embedding)} dims)")
+
+        if turn.traits and (turn.traits.emotional_giving or turn.traits.emotional_needs):
+            from kandal.profiling.embeddings import embed_emotional_dynamics
+            giving_emb, needs_emb = embed_emotional_dynamics(
+                turn.traits.emotional_giving, turn.traits.emotional_needs
+            )
+            emb_update = {}
+            if giving_emb:
+                emb_update["emotional_giving_embedding"] = giving_emb
+            if needs_emb:
+                emb_update["emotional_needs_embedding"] = needs_emb
+            if emb_update:
+                client.table("profiles").update(emb_update).eq(
+                    "id", str(profile_id)
+                ).execute()
+                print(f"  emotional_embeddings ✓")
 
         client.table("profiling_conversations").insert({
             "profile_id": str(profile_id),

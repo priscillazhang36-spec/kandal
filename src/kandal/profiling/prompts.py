@@ -35,6 +35,7 @@ TRAIT_DIMENSIONS = [
     "partner_preferences",
     "birth_info",
     "matching_priorities",
+    "emotional_dynamics",
 ]
 
 CONVERSATION_SYSTEM_PROMPT = """\
@@ -83,6 +84,13 @@ PHASE 2 — GO DEEPER (middle exchanges):
 Now transition into the emotional/relational stuff. Use what they already told \
 you as bridges ("you mentioned X — I'm curious, is that how you are in \
 relationships too?"). This is where you explore:
+- **Emotional dynamics (MOST IMPORTANT)**: How they show up for someone they love \
+and what they need to feel from a partner. This is the core of matching — not \
+traits, but how they make people FEEL. Ask things like "what do people say it \
+feels like to be with you?" or "when a relationship is really working, what does \
+that feel like for you?" or "how do you show someone you care about them?" \
+Also explore what they need: "what makes you feel most loved?" or "when have you \
+felt like the best version of yourself with someone — what were they doing?"
 - How they show love and how they want to receive it
 - How they handle conflict and disagreements
 - Their relationship background and what they've learned from past experiences
@@ -173,7 +181,9 @@ You must return valid JSON matching this exact schema:
   "birth_date": "YYYY-MM-DD" if they shared their birthday, or null,
   "birth_time_approx": approximate birth time as "HH:00-HH:00" (3hr window) if shared — convert "morning" to "06:00-09:00", "afternoon" to "12:00-15:00", "evening" to "18:00-21:00", "night" to "21:00-00:00", "early morning" to "03:00-06:00". Use null if not shared.,
   "birth_city": city name if they shared where they were born, or null,
-  "dimension_weights": personalized weights reflecting what this person cares about most — a dict mapping dimension names to floats that MUST sum to 1.0. The dimensions are: "interest_overlap", "personality_match", "values_alignment", "lifestyle_signals", "communication_style", "attachment_style", "love_language_fit", "conflict_style", "relationship_history", "bazi_compatibility". Infer from what they emphasized: if they talked a lot about wanting someone who handles conflict well, boost conflict_style. If they care about shared hobbies, boost interest_overlap. If they mentioned zodiac/destiny/spiritual compatibility, boost bazi_compatibility. If they didn't express clear priorities, use null and we'll fall back to defaults.,
+  "emotional_giving": "~40 word description of how this person makes partners feel — their emotional strengths, how they show care, what being loved by them is like. Distill from what they said about how they show up in relationships. Use null if not enough signal.",
+  "emotional_needs": "~40 word description of what this person needs to feel from a partner — what makes them feel cared for, safe, and like the best version of themselves. Distill from what they explicitly said they need. Use null if not enough signal.",
+  "dimension_weights": personalized weights reflecting what this person cares about most — a dict mapping dimension names to floats that MUST sum to 1.0. The dimensions are: "interest_overlap", "personality_match", "values_alignment", "lifestyle_signals", "communication_style", "attachment_style", "love_language_fit", "conflict_style", "relationship_history", "bazi_compatibility", "emotional_fit". Infer from what they emphasized: if they talked a lot about wanting someone who handles conflict well, boost conflict_style. If they care about shared hobbies, boost interest_overlap. If they mentioned zodiac/destiny/spiritual compatibility, boost bazi_compatibility. If they talked about how someone makes them feel, boost emotional_fit. If they didn't express clear priorities, use null and we'll fall back to defaults.,
   "narrative": "~80 word concise matchmaker's notes"
 }
 """
@@ -191,7 +201,8 @@ Return valid JSON:
   "relationship_history": <float 0-1>,
   "partner_preferences": <float 0-1>,
   "birth_info": <float 0-1>,
-  "matching_priorities": <float 0-1>
+  "matching_priorities": <float 0-1>,
+  "emotional_dynamics": <float 0-1>
 }
 
 0.0 = no signal at all, 0.5 = some hints, 0.7 = fairly confident, 1.0 = very clear.
@@ -200,6 +211,8 @@ partner_preferences = whether we know their gender preference and any cultural p
 birth_info = whether we have their birthday, approximate birth time, and birthplace.
 matching_priorities = whether we know what they value most in a match (shared interests, \
 emotional compatibility, conflict handling, destiny/bazi, values, etc).
+emotional_dynamics = whether we understand how this person makes partners feel AND what \
+they need to feel from a partner. Both sides needed for high confidence.
 """
 
 SUMMARY_SYSTEM_PROMPT = """\
@@ -209,6 +222,8 @@ Write a quick summary of what you learned about them so they can confirm it's ri
 Tone: casual, warm — like a friend saying "ok so here's what I've got on you."
 
 Include:
+- How they show up for someone they love — what it feels like to be with them
+- What they need to feel from a partner to be their best self
 - Who they're into (gender, any cultural preferences, or "open to all")
 - How they love and want to be loved
 - How they deal with conflict
@@ -240,7 +255,7 @@ def build_conversation_prompt(
     if ratio < 0.3:
         phase_hint = "You are in PHASE 1 (getting to know them). Focus on light questions and collecting basic info (birthday, birth time, birthplace, who they're into)."
     elif ratio < 0.8:
-        phase_hint = "You are in PHASE 2 (going deeper). Basic info should be collected by now. Focus on emotional/relational questions — love languages, conflict, attachment, relationship history."
+        phase_hint = "You are in PHASE 2 (going deeper). Basic info should be collected by now. Focus on emotional dynamics (how they make partners feel, what they need to feel), love languages, conflict, attachment, relationship history."
     else:
         phase_hint = "You are in PHASE 3 (priorities). Focus on what matters most to them in a match, and fill any remaining coverage gaps."
 
@@ -266,12 +281,18 @@ def build_summary_prompt(traits: InferredTraits, narrative: str) -> str:
     """Format extracted traits into a prompt for the summary LLM call."""
     parts = [
         f"Extracted traits:\n"
+    ]
+    if traits.emotional_giving:
+        parts.append(f"- How they show up for a partner: {traits.emotional_giving}\n")
+    if traits.emotional_needs:
+        parts.append(f"- What they need to feel: {traits.emotional_needs}\n")
+    parts.append(
         f"- Attachment style: {traits.attachment_style}\n"
         f"- Gives love through: {', '.join(traits.love_language_giving[:3])}\n"
         f"- Wants to receive: {', '.join(traits.love_language_receiving[:3])}\n"
         f"- Conflict style: {traits.conflict_style}\n"
         f"- Relationship history: {traits.relationship_history}\n"
-    ]
+    )
     if traits.gender_preference:
         parts.append(f"- Attracted to: {', '.join(traits.gender_preference)}\n")
     if traits.cultural_preferences:

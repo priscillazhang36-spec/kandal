@@ -36,6 +36,9 @@ class InferredTraits(BaseModel):
     birth_time_approx: str | None = None   # "HH:00-HH:00" 3hr window
     birth_city: str | None = None
     dimension_weights: dict[str, float] | None = None  # personalized scoring priorities
+    # Emotional dynamics — the core matching signal
+    emotional_giving: str | None = None    # how this person makes partners feel
+    emotional_needs: str | None = None     # what they need to feel from a partner
 
 
 def _argmax_with_priority(counts: dict[str, int], priority: list[str]) -> str:

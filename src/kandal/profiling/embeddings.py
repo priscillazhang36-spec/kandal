@@ -28,6 +28,34 @@ def embed_narrative(narrative: str) -> list[float]:
     return result.embeddings[0]
 
 
+def embed_emotional_dynamics(
+    giving: str | None, needs: str | None
+) -> tuple[list[float] | None, list[float] | None]:
+    """Generate embeddings for emotional giving and needs descriptions.
+
+    Returns (giving_embedding, needs_embedding). Either may be None if input is None.
+    """
+    texts_to_embed = []
+    giving_idx = needs_idx = None
+
+    if giving:
+        giving_idx = len(texts_to_embed)
+        texts_to_embed.append(giving)
+    if needs:
+        needs_idx = len(texts_to_embed)
+        texts_to_embed.append(needs)
+
+    if not texts_to_embed:
+        return None, None
+
+    client = _get_client()
+    result = client.embed(texts_to_embed, model=EMBEDDING_MODEL)
+
+    giving_emb = result.embeddings[giving_idx] if giving_idx is not None else None
+    needs_emb = result.embeddings[needs_idx] if needs_idx is not None else None
+    return giving_emb, needs_emb
+
+
 def store_narrative_and_embedding(
     profile_id: UUID, narrative: str, embedding: list[float]
 ) -> None:

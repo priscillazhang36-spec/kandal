@@ -1,3 +1,4 @@
+import math
 from datetime import date
 
 from pydantic import BaseModel
@@ -19,19 +20,21 @@ class ScoringResult(BaseModel):
 
 
 DIMENSION_WEIGHTS: dict[str, dict] = {
+    # Tier 0 — emotional dynamics (core signal)
+    "emotional_fit": {"weight": 0.25, "tier": 0},
     # Tier 1 — tag-based
-    "interest_overlap": {"weight": 0.10, "tier": 1},
-    "personality_match": {"weight": 0.11, "tier": 1},
-    "values_alignment": {"weight": 0.11, "tier": 1},
-    "lifestyle_signals": {"weight": 0.07, "tier": 1},
-    "communication_style": {"weight": 0.05, "tier": 1},
+    "interest_overlap": {"weight": 0.08, "tier": 1},
+    "personality_match": {"weight": 0.08, "tier": 1},
+    "values_alignment": {"weight": 0.08, "tier": 1},
+    "lifestyle_signals": {"weight": 0.05, "tier": 1},
+    "communication_style": {"weight": 0.03, "tier": 1},
     # Tier 2 — inferred from questionnaire
-    "attachment_style": {"weight": 0.08, "tier": 2},
-    "love_language_fit": {"weight": 0.05, "tier": 2},
-    "conflict_style": {"weight": 0.10, "tier": 2},
+    "attachment_style": {"weight": 0.06, "tier": 2},
+    "love_language_fit": {"weight": 0.04, "tier": 2},
+    "conflict_style": {"weight": 0.08, "tier": 2},
     "relationship_history": {"weight": 0.03, "tier": 2},
     # Tier 2 — bazi
-    "bazi_compatibility": {"weight": 0.30, "tier": 2},
+    "bazi_compatibility": {"weight": 0.22, "tier": 2},
 }
 
 
@@ -196,6 +199,42 @@ def _score_bazi_compatibility(
     return score_bazi_compatibility(bazi_a, bazi_b)
 
 
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Cosine similarity between two vectors. Returns 0.0 on degenerate input."""
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    # Cosine similarity is [-1, 1]; rescale to [0, 1]
+    return (dot / (norm_a * norm_b) + 1) / 2
+
+
+def _score_emotional_fit(profile_a: Profile, profile_b: Profile) -> float:
+    """Score emotional fit by cross-comparing giving/needs embeddings.
+
+    A's giving style is compared to B's needs, and vice versa.
+    Returns 0.5 (neutral) if either user lacks embeddings.
+    """
+    a_giving = profile_a.emotional_giving_embedding
+    a_needs = profile_a.emotional_needs_embedding
+    b_giving = profile_b.emotional_giving_embedding
+    b_needs = profile_b.emotional_needs_embedding
+
+    scores = []
+    # Does A's way of loving match what B needs?
+    if a_giving and b_needs:
+        scores.append(_cosine_similarity(a_giving, b_needs))
+    # Does B's way of loving match what A needs?
+    if b_giving and a_needs:
+        scores.append(_cosine_similarity(b_giving, a_needs))
+
+    if not scores:
+        return 0.5  # neutral when data is missing
+
+    return sum(scores) / len(scores)
+
+
 def _compute_raw_scores(
     profile_a: Profile, prefs_a: Preferences,
     profile_b: Profile, prefs_b: Preferences,
@@ -205,6 +244,8 @@ def _compute_raw_scores(
     for dim_name in DIMENSION_WEIGHTS:
         if dim_name == "bazi_compatibility":
             raw_scores[dim_name] = _score_bazi_compatibility(profile_a, profile_b)
+        elif dim_name == "emotional_fit":
+            raw_scores[dim_name] = _score_emotional_fit(profile_a, profile_b)
         else:
             raw_scores[dim_name] = _SCORE_FNS[dim_name](prefs_a, prefs_b)
     return raw_scores

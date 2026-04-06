@@ -22,5 +22,9 @@ class Profile(BaseModel):
     birth_date: date | None = None
     birth_time_approx: str | None = None
     birth_city: str | None = None
+    emotional_giving: str | None = None
+    emotional_needs: str | None = None
+    emotional_giving_embedding: list[float] | None = None
+    emotional_needs_embedding: list[float] | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
