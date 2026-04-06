@@ -5,15 +5,12 @@ LANDING_HTML = r'''<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>kandal</title>
   <meta name="description" content="An AI matchmaker that gets to know you through text.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #000; color: #f5ead6;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0c15; color: #f5ead6;
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
     }
@@ -21,45 +18,40 @@ LANDING_HTML = r'''<!DOCTYPE html>
     .bg {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       z-index: 0;
-      background: #0f0c15;
       overflow: hidden;
     }
 
-    .orb { position: absolute; border-radius: 50%; }
+    .orb { position: absolute; border-radius: 50%; will-change: transform; }
 
     .orb-1 {
-      width: 600px; height: 600px;
-      background: #3a6e9e;
-      opacity: 0.25;
-      top: -15%; right: -10%;
-      filter: blur(120px);
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, #3a6e9e 0%, transparent 70%);
+      opacity: 0.3;
+      top: -10%; right: -5%;
       animation: float1 12s ease-in-out infinite;
     }
 
     .orb-2 {
-      width: 600px; height: 600px;
-      background: #f0923a;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, #f0923a 0%, transparent 70%);
       opacity: 0.35;
-      bottom: -15%; left: -10%;
-      filter: blur(110px);
+      bottom: -10%; left: -5%;
       animation: float2 14s ease-in-out infinite;
     }
 
     .orb-3 {
-      width: 350px; height: 350px;
-      background: #5b8ebf;
-      opacity: 0.15;
+      width: 250px; height: 250px;
+      background: radial-gradient(circle, #5b8ebf 0%, transparent 70%);
+      opacity: 0.2;
       top: 40%; left: 30%;
-      filter: blur(100px);
       animation: float3 18s ease-in-out infinite;
     }
 
     .orb-4 {
-      width: 300px; height: 300px;
-      background: #f5a640;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, #f5a640 0%, transparent 70%);
       opacity: 0.2;
       top: 10%; left: 50%;
-      filter: blur(90px);
       animation: float4 20s ease-in-out infinite;
     }
 
@@ -92,7 +84,9 @@ LANDING_HTML = r'''<!DOCTYPE html>
 
     .page {
       position: relative; z-index: 1;
-      min-height: 100vh; display: flex; flex-direction: column;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex; flex-direction: column;
     }
 
     nav {
@@ -141,11 +135,12 @@ LANDING_HTML = r'''<!DOCTYPE html>
     }
 
     .phone-input {
-      width: 100%; font-family: inherit; font-size: 0.9rem;
+      width: 100%; font-family: inherit; font-size: 1rem;
       color: #f5ead6; background: rgba(245, 234, 214, 0.08);
       border: 1px solid rgba(245, 234, 214, 0.12);
       border-radius: 10px; padding: 0.75rem 0.9rem 0.75rem 2.5rem;
-      outline: none; transition: all 0.15s;
+      outline: none; transition: border-color 0.15s, background 0.15s;
+      -webkit-appearance: none;
     }
     .phone-input:focus {
       border-color: rgba(245, 234, 214, 0.3);
@@ -157,9 +152,11 @@ LANDING_HTML = r'''<!DOCTYPE html>
       font-family: inherit; font-size: 0.9rem; font-weight: 600;
       color: #0f0c15; background: #f5ead6; border: none;
       padding: 0.75rem 1.5rem; border-radius: 10px;
-      cursor: pointer; transition: all 0.2s; white-space: nowrap;
+      cursor: pointer; transition: opacity 0.2s; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
     }
     .submit-btn:hover { opacity: 0.85; }
+    .submit-btn:active { opacity: 0.7; }
     .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .form-hint {
@@ -187,10 +184,24 @@ LANDING_HTML = r'''<!DOCTYPE html>
     footer p { font-size: 0.7rem; color: rgba(245, 234, 214, 0.2); }
 
     @media (max-width: 640px) {
-      nav { padding: 1.25rem 1.25rem; }
-      main { padding: 2rem 1.25rem 3rem; }
-      .phone-form { flex-direction: column; }
-      .submit-btn { width: 100%; }
+      nav { padding: 1rem 1.5rem; }
+      main { padding: 1.5rem 1.5rem 2.5rem; }
+      .tagline { max-width: 90%; }
+      .sub { max-width: 90%; margin-bottom: 2rem; }
+      .signup { max-width: 90%; }
+      .phone-form { flex-direction: column; gap: 0.75rem; }
+      .submit-btn { width: 100%; padding: 0.85rem 1.5rem; }
+      footer { padding: 1.25rem 1.5rem; }
+
+      .orb-1 { width: 250px; height: 250px; }
+      .orb-2 { width: 250px; height: 250px; }
+      .orb-3 { width: 150px; height: 150px; }
+      .orb-4 { width: 120px; height: 120px; }
+    }
+
+    @media (max-width: 380px) {
+      .tagline { font-size: 1.4rem; }
+      .sub { font-size: 0.85rem; }
     }
   </style>
 </head>
