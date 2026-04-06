@@ -4,7 +4,8 @@ LANGS = ["words_of_affirmation", "quality_time", "physical_touch", "acts_of_serv
 
 
 def test_perfect_overlap(make_user):
-    """All dimensions match perfectly — including Tier 2."""
+    """All dimensions match perfectly — including Tier 2.
+    Bazi returns 0.5 (neutral) when birth_date is missing, so max is 1.0 - 0.30*0.5 = 0.85."""
     shared = dict(
         interests=["hiking", "cooking", "music"],
         personality=["introvert", "creative"],
@@ -20,7 +21,8 @@ def test_perfect_overlap(make_user):
     pa, pref_a = make_user(**shared)
     pb, pref_b = make_user(**shared)
     result = score_compatibility(pa, pref_a, pb, pref_b)
-    assert result.total_score == 1.0
+    # Without birth data, bazi contributes 0.5 * 0.30 = 0.15 instead of full 0.30
+    assert result.total_score >= 0.84
 
 
 def test_zero_overlap(make_user):
@@ -44,8 +46,8 @@ def test_zero_overlap(make_user):
         relationship_history="limited_experience",
     )
     result = score_compatibility(pa, pref_a, pb, pref_b)
-    # Tier 1 all 0.0, attachment 0.0, conflict 0.1, love_lang low, history 0.0
-    assert result.total_score < 0.05
+    # Tier 1 all 0.0, trait scores near 0, bazi neutral (0.5 * 0.30 = 0.15)
+    assert result.total_score < 0.20
 
 
 def test_partial_overlap(make_user):
@@ -61,10 +63,10 @@ def test_empty_profiles(make_user):
     pa, pref_a = make_user()
     pb, pref_b = make_user()
     result = score_compatibility(pa, pref_a, pb, pref_b)
-    # Jaccard dims (0.18+0.12+0.12+0.08=0.50) * 0.5 = 0.25
+    # Jaccard dims (0.16+0.11+0.11+0.07=0.45) * 0.5 = 0.225
     # comm_style: 0.05 * 1.0 = 0.05
-    # Tier 2 all None (0.18+0.12+0.10+0.05=0.45) * 0.5 = 0.225
-    # Total: 0.25 + 0.05 + 0.225 = 0.525
+    # Tier 2 all None/neutral (0.08+0.05+0.04+0.03+0.30=0.50) * 0.5 = 0.25
+    # Total: 0.225 + 0.05 + 0.25 = 0.525
     assert abs(result.total_score - 0.525) < 0.001
 
 

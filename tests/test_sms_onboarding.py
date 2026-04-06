@@ -65,8 +65,13 @@ def test_correct_verification_code(mock_sb, mock_load, mock_save, mock_send):
 
     reply = route_message("+15551234567", "123456")
 
-    assert "Ready?" in reply or "first one" in reply
-    assert session.state == "onboarding_q1"
+    # May start adaptive profiling or fall back to fixed questions
+    assert (
+        "alter ego" in reply
+        or "Ready?" in reply
+        or "first one" in reply
+    )
+    assert session.state in ("adaptive_profiling", "onboarding_q1")
     assert str(session.profile_id) == profile_id
 
 
@@ -207,7 +212,7 @@ def test_collecting_gender(mock_load, mock_save, mock_send):
     reply = route_message("+15551234567", "Female")
 
     assert session.collected_basics["gender"] == "female"
-    assert session.state == "collecting_city"
+    assert session.state == "collecting_gender_preference"
 
 
 @patch("kandal.sms.handler.send_sms")

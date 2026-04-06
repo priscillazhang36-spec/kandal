@@ -30,19 +30,31 @@ def run_batch():
         if not passes_dealbreakers(pa, pref_a, pb, pref_b):
             continue
 
-        # Stage 2: Score
-        result = score_compatibility(pa, pref_a, pb, pref_b)
+        # Stage 2: Score from each user's perspective
+        result_a = score_compatibility(
+            pa, pref_a, pb, pref_b,
+            perspective_weights=pref_a.dimension_weights,
+        )
+        result_b = score_compatibility(
+            pa, pref_a, pb, pref_b,
+            perspective_weights=pref_b.dimension_weights,
+        )
 
-        # Stage 3: Verdict
-        verdict = compute_verdict(result, pref_a.selectivity, pref_b.selectivity)
+        # Stage 3: Verdict — each user checked against their own score
+        verdict = compute_verdict(result_a, result_b, pref_a.selectivity, pref_b.selectivity)
 
         if verdict == "match":
             matches_to_insert.append(
                 {
                     "profile_a_id": str(id_a),
                     "profile_b_id": str(id_b),
-                    "score": result.total_score,
-                    "breakdown": {d.dimension: d.score for d in result.breakdown},
+                    "score": round((result_a.total_score + result_b.total_score) / 2, 4),
+                    "breakdown": {
+                        "perspective_a": {d.dimension: d.score for d in result_a.breakdown},
+                        "perspective_b": {d.dimension: d.score for d in result_b.breakdown},
+                        "weights_a": {d.dimension: d.weight for d in result_a.breakdown},
+                        "weights_b": {d.dimension: d.weight for d in result_b.breakdown},
+                    },
                     "verdict": verdict,
                 }
             )

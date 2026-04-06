@@ -17,6 +17,8 @@ class Preferences(BaseModel):
     communication_style: str = "balanced"
     lifestyle: list[str] = []
     selectivity: str = "balanced"
+    cultural_preferences: list[str] = []
+    dimension_weights: dict[str, float] | None = None  # personalized scoring weights
     # Tier 2 — inferred from questionnaire
     attachment_style: str | None = None
     love_language_giving: list[str] = []

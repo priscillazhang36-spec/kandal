@@ -76,20 +76,37 @@ def _finalize(session: OnboardingSession) -> None:
     }
     if narrative:
         profile_update["narrative"] = narrative
+    if traits.birth_date:
+        profile_update["birth_date"] = traits.birth_date
+    if traits.birth_time_approx:
+        profile_update["birth_time_approx"] = traits.birth_time_approx
+    if traits.birth_city:
+        profile_update["birth_city"] = traits.birth_city
 
     client.table("profiles").update(profile_update).eq(
         "id", str(session.profile_id)
     ).execute()
 
+    # Gender preference: conversation-extracted takes priority, basics-collected as fallback
+    gender_pref = traits.gender_preference or session.collected_basics.get("gender_preference")
+
+    prefs_data = {
+        "profile_id": str(session.profile_id),
+        "attachment_style": traits.attachment_style,
+        "love_language_giving": traits.love_language_giving,
+        "love_language_receiving": traits.love_language_receiving,
+        "conflict_style": traits.conflict_style,
+        "relationship_history": traits.relationship_history,
+    }
+    if gender_pref:
+        prefs_data["gender_preferences"] = gender_pref
+    if traits.cultural_preferences:
+        prefs_data["cultural_preferences"] = traits.cultural_preferences
+    if traits.dimension_weights:
+        prefs_data["dimension_weights"] = traits.dimension_weights
+
     client.table("preferences").upsert(
-        {
-            "profile_id": str(session.profile_id),
-            "attachment_style": traits.attachment_style,
-            "love_language_giving": traits.love_language_giving,
-            "love_language_receiving": traits.love_language_receiving,
-            "conflict_style": traits.conflict_style,
-            "relationship_history": traits.relationship_history,
-        },
+        prefs_data,
         on_conflict="profile_id",
     ).execute()
 
@@ -180,11 +197,16 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
     try:
         from kandal.profiling.engine import ProfilingEngine, ProfilingState
 
+        conv_status = conv.get("status", "in_progress")
         state = ProfilingState(
             profile_id=UUID(str(session.profile_id)),
             messages=conv["messages"],
             coverage=conv.get("coverage", {}),
             questions_asked=len([m for m in conv["messages"] if m["role"] == "assistant"]),
+            awaiting_confirmation=(conv_status == "awaiting_confirmation"),
+            awaiting_ranking=(conv_status == "awaiting_ranking"),
+            pending_traits=conv.get("extracted_traits"),
+            pending_narrative=conv.get("narrative"),
         )
 
         engine = ProfilingEngine()
@@ -196,7 +218,19 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
             "coverage": turn.coverage,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-        if turn.is_complete:
+        if turn.awaiting_ranking:
+            update_data["status"] = "awaiting_ranking"
+            if turn.traits:
+                update_data["extracted_traits"] = turn.traits.model_dump()
+            if turn.narrative:
+                update_data["narrative"] = turn.narrative
+        elif turn.awaiting_confirmation:
+            update_data["status"] = "awaiting_confirmation"
+            if turn.traits:
+                update_data["extracted_traits"] = turn.traits.model_dump()
+            if turn.narrative:
+                update_data["narrative"] = turn.narrative
+        elif turn.is_complete:
             update_data["status"] = "complete"
             if turn.traits:
                 update_data["extracted_traits"] = turn.traits.model_dump()
@@ -279,6 +313,27 @@ def _handle_collecting_gender(session: OnboardingSession, body: str) -> str:
         return messages.BASICS_GENDER_INVALID
 
     session.collected_basics["gender"] = cleaned
+    session.state = "collecting_gender_preference"
+    _save_session(session)
+    return messages.BASICS_GENDER_PREFERENCE
+
+
+def _parse_gender_preference(text: str) -> list[str] | None:
+    """Parse free-text gender preference into a list of valid genders."""
+    cleaned = text.strip().lower()
+    # Handle common shortcuts
+    if cleaned in ("both", "everyone", "all", "any", "no preference"):
+        return ["male", "female", "nonbinary"]
+    found = [g for g in VALID_GENDERS if g in cleaned]
+    return found if found else None
+
+
+def _handle_collecting_gender_preference(session: OnboardingSession, body: str) -> str:
+    prefs = _parse_gender_preference(body)
+    if prefs is None:
+        return messages.BASICS_GENDER_PREFERENCE_INVALID
+
+    session.collected_basics["gender_preference"] = prefs
     session.state = "collecting_city"
     _save_session(session)
     return messages.BASICS_CITY
@@ -318,6 +373,8 @@ def route_message(phone: str, body: str) -> str:
         reply = _handle_collecting_age(session, body)
     elif state == "collecting_gender":
         reply = _handle_collecting_gender(session, body)
+    elif state == "collecting_gender_preference":
+        reply = _handle_collecting_gender_preference(session, body)
     elif state == "collecting_city":
         reply = _handle_collecting_city(session, body)
     elif state == "complete":

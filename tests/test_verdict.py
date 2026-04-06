@@ -7,16 +7,34 @@ def _make_result(score: float) -> ScoringResult:
 
 
 def test_match_both_open():
-    assert compute_verdict(_make_result(0.35), "open", "open") == "match"
+    r = _make_result(0.35)
+    assert compute_verdict(r, r, "open", "open") == "match"
 
 
 def test_no_match_one_picky():
-    assert compute_verdict(_make_result(0.55), "picky", "balanced") == "no_match"
+    r = _make_result(0.55)
+    assert compute_verdict(r, r, "picky", "balanced") == "no_match"
 
 
 def test_match_both_balanced():
-    assert compute_verdict(_make_result(0.55), "balanced", "balanced") == "match"
+    r = _make_result(0.55)
+    assert compute_verdict(r, r, "balanced", "balanced") == "match"
 
 
 def test_no_match_below_both():
-    assert compute_verdict(_make_result(0.25), "balanced", "balanced") == "no_match"
+    r = _make_result(0.25)
+    assert compute_verdict(r, r, "balanced", "balanced") == "no_match"
+
+
+def test_asymmetric_scores():
+    """User A loves the match but user B doesn't — no match."""
+    r_a = _make_result(0.80)
+    r_b = _make_result(0.40)
+    assert compute_verdict(r_a, r_b, "balanced", "balanced") == "no_match"
+
+
+def test_asymmetric_scores_both_pass():
+    """Both users exceed their own thresholds — match."""
+    r_a = _make_result(0.60)
+    r_b = _make_result(0.55)
+    assert compute_verdict(r_a, r_b, "balanced", "balanced") == "match"

@@ -205,8 +205,10 @@ def main():
     for (pa, pref_a), (pb, pref_b) in combinations(all_users, 2):
         if not passes_dealbreakers(pa, pref_a, pb, pref_b):
             continue
-        result = score_compatibility(pa, pref_a, pb, pref_b)
-        verdict = compute_verdict(result, pref_a.selectivity, pref_b.selectivity)
+        result_a = score_compatibility(pa, pref_a, pb, pref_b, perspective_weights=pref_a.dimension_weights)
+        result_b = score_compatibility(pa, pref_a, pb, pref_b, perspective_weights=pref_b.dimension_weights)
+        result = result_a  # use A's perspective for display
+        verdict = compute_verdict(result_a, result_b, pref_a.selectivity, pref_b.selectivity)
 
         involves_you = pa.name == "You" or pb.name == "You"
         if involves_you:

@@ -15,40 +15,58 @@ def main():
     engine = ProfilingEngine()
     state, opening = engine.start(profile_id)
 
-    print(f"\nMatchmaker: {opening}\n")
+    print(f"\nKandal: {opening}\n")
 
     while True:
         reply = input("You: ").strip()
         if not reply:
             continue
         turn = engine.next_turn(state, reply)
-        print(f"\nMatchmaker: {turn.reply}\n")
+        print(f"\nKandal: {turn.reply}\n")
+
         if turn.is_complete:
             break
+        # awaiting_confirmation — keep looping so user can confirm or correct
 
     # Store to Supabase
     try:
         client = get_supabase()
         print("\nSaving to Supabase...")
 
-        client.table("profiles").insert({
+        profile_data = {
             "id": str(profile_id),
             "name": "Test User",
             "age": 25,
             "gender": "female",
             "is_active": True,
             "narrative": turn.narrative,
-        }).execute()
+        }
+        if turn.traits and turn.traits.birth_date:
+            profile_data["birth_date"] = turn.traits.birth_date
+        if turn.traits and turn.traits.birth_time_approx:
+            profile_data["birth_time_approx"] = turn.traits.birth_time_approx
+        if turn.traits and turn.traits.birth_city:
+            profile_data["birth_city"] = turn.traits.birth_city
+
+        client.table("profiles").insert(profile_data).execute()
         print("  profiles ✓")
 
-        client.table("preferences").insert({
+        prefs_data = {
             "profile_id": str(profile_id),
             "attachment_style": turn.traits.attachment_style,
             "love_language_giving": turn.traits.love_language_giving,
             "love_language_receiving": turn.traits.love_language_receiving,
             "conflict_style": turn.traits.conflict_style,
             "relationship_history": turn.traits.relationship_history,
-        }).execute()
+        }
+        if turn.traits.gender_preference:
+            prefs_data["gender_preferences"] = turn.traits.gender_preference
+        if turn.traits.cultural_preferences:
+            prefs_data["cultural_preferences"] = turn.traits.cultural_preferences
+        if turn.traits.dimension_weights:
+            prefs_data["dimension_weights"] = turn.traits.dimension_weights
+
+        client.table("preferences").insert(prefs_data).execute()
         print("  preferences ✓")
 
         # Generate and store narrative embedding

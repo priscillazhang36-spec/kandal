@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel
 
 from kandal.models.preferences import Preferences
@@ -18,16 +20,18 @@ class ScoringResult(BaseModel):
 
 DIMENSION_WEIGHTS: dict[str, dict] = {
     # Tier 1 — tag-based
-    "interest_overlap": {"weight": 0.18, "tier": 1},
-    "personality_match": {"weight": 0.12, "tier": 1},
-    "values_alignment": {"weight": 0.12, "tier": 1},
-    "lifestyle_signals": {"weight": 0.08, "tier": 1},
+    "interest_overlap": {"weight": 0.10, "tier": 1},
+    "personality_match": {"weight": 0.11, "tier": 1},
+    "values_alignment": {"weight": 0.11, "tier": 1},
+    "lifestyle_signals": {"weight": 0.07, "tier": 1},
     "communication_style": {"weight": 0.05, "tier": 1},
     # Tier 2 — inferred from questionnaire
-    "attachment_style": {"weight": 0.18, "tier": 2},
-    "love_language_fit": {"weight": 0.12, "tier": 2},
+    "attachment_style": {"weight": 0.08, "tier": 2},
+    "love_language_fit": {"weight": 0.05, "tier": 2},
     "conflict_style": {"weight": 0.10, "tier": 2},
-    "relationship_history": {"weight": 0.05, "tier": 2},
+    "relationship_history": {"weight": 0.03, "tier": 2},
+    # Tier 2 — bazi
+    "bazi_compatibility": {"weight": 0.30, "tier": 2},
 }
 
 
@@ -160,24 +164,79 @@ _SCORE_FNS = {
 }
 
 
+def _parse_approx_hour(approx: str | None) -> int | None:
+    """Convert '09:00-12:00' to midpoint hour. Returns None if unparseable."""
+    if not approx:
+        return None
+    try:
+        start = int(approx.split("-")[0].split(":")[0])
+        end = int(approx.split("-")[1].split(":")[0])
+        if end < start:
+            end += 24
+        return ((start + end) // 2) % 24
+    except (ValueError, IndexError):
+        return None
+
+
+def _score_bazi_compatibility(
+    profile_a: Profile, profile_b: Profile,
+) -> float:
+    """Score Bazi compatibility. Returns 0.5 (neutral) if either lacks birth data."""
+    if not profile_a.birth_date or not profile_b.birth_date:
+        return 0.5
+
+    from kandal.scoring.bazi import compute_bazi_profile, score_bazi_compatibility
+
+    hour_a = _parse_approx_hour(profile_a.birth_time_approx)
+    hour_b = _parse_approx_hour(profile_b.birth_time_approx)
+
+    bazi_a = compute_bazi_profile(profile_a.birth_date, hour_a)
+    bazi_b = compute_bazi_profile(profile_b.birth_date, hour_b)
+
+    return score_bazi_compatibility(bazi_a, bazi_b)
+
+
+def _compute_raw_scores(
+    profile_a: Profile, prefs_a: Preferences,
+    profile_b: Profile, prefs_b: Preferences,
+) -> dict[str, float]:
+    """Compute raw (unweighted) score for each dimension. Pure function."""
+    raw_scores = {}
+    for dim_name in DIMENSION_WEIGHTS:
+        if dim_name == "bazi_compatibility":
+            raw_scores[dim_name] = _score_bazi_compatibility(profile_a, profile_b)
+        else:
+            raw_scores[dim_name] = _SCORE_FNS[dim_name](prefs_a, prefs_b)
+    return raw_scores
+
+
 def score_compatibility(
     profile_a: Profile,
     prefs_a: Preferences,
     profile_b: Profile,
     prefs_b: Preferences,
+    perspective_weights: dict[str, float] | None = None,
 ) -> ScoringResult:
-    """Pure function. Compute weighted compatibility score across all dimensions."""
+    """Compute weighted compatibility score across all dimensions.
+
+    If perspective_weights is provided, uses those instead of global defaults.
+    This allows each user to have personalized scoring priorities.
+    """
+    raw_scores = _compute_raw_scores(profile_a, prefs_a, profile_b, prefs_b)
+    weights = perspective_weights or {k: v["weight"] for k, v in DIMENSION_WEIGHTS.items()}
+
     breakdown = []
     total = 0.0
     for dim_name, meta in DIMENSION_WEIGHTS.items():
-        raw = _SCORE_FNS[dim_name](prefs_a, prefs_b)
+        raw = raw_scores[dim_name]
+        w = weights.get(dim_name, meta["weight"])
         breakdown.append(
             DimensionScore(
                 dimension=dim_name,
                 score=raw,
-                weight=meta["weight"],
+                weight=w,
                 tier=meta["tier"],
             )
         )
-        total += raw * meta["weight"]
+        total += raw * w
     return ScoringResult(total_score=round(total, 4), breakdown=breakdown)

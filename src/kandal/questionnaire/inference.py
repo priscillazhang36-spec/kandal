@@ -29,6 +29,13 @@ class InferredTraits(BaseModel):
     love_language_receiving: list[str]
     conflict_style: str
     relationship_history: str
+    # Extended fields from adaptive profiling (optional for backward compat)
+    gender_preference: list[str] | None = None
+    cultural_preferences: list[str] | None = None
+    birth_date: str | None = None          # ISO format "YYYY-MM-DD"
+    birth_time_approx: str | None = None   # "HH:00-HH:00" 3hr window
+    birth_city: str | None = None
+    dimension_weights: dict[str, float] | None = None  # personalized scoring priorities
 
 
 def _argmax_with_priority(counts: dict[str, int], priority: list[str]) -> str:

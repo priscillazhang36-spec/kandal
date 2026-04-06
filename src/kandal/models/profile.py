@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -19,5 +19,8 @@ class Profile(BaseModel):
     profile_version: int = 1
     embedding_version: int = 0
     last_significant_change: datetime | None = None
+    birth_date: date | None = None
+    birth_time_approx: str | None = None
+    birth_city: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

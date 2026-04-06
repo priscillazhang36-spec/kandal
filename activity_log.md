@@ -58,13 +58,30 @@
 - **Mobile-first responsive** — Stacked layout on mobile, 3-column grid on desktop
 - **Domain** — kandal.app purchased (Squarespace)
 
+## Phase 6: Profiling Overhaul + Bazi Integration
+**What:** Overhauled the profiling conversation to position the agent as the user's "dating alter ego," added Bazi compatibility, and improved conversation quality.
+
+- **Digital alter ego positioning** — Rewrote all profiling prompts to frame the agent as the user's dating alter ego, not a matchmaker (`src/kandal/profiling/prompts.py`)
+- **Natural conversation style** — System prompt now instructs varied message lengths (1-4 sentences), best friend energy, casual tone
+- **Partner preference questions** — Conversation now surfaces gender preference and cultural/racial preferences naturally
+- **Bazi (Four Pillars) module** — Pure-function module computing Four Pillars from birth date/time, scoring element compatibility via generating/controlling cycles, Six Harmonies, Three Harmonies, and Six Clashes (`src/kandal/scoring/bazi.py`)
+- **Birth info collection** — Conversation asks for birthday, approximate birth time (3hr window), and birthplace for Bazi matching
+- **Bazi scoring dimension** — Added `bazi_compatibility` as a new Tier 2 scoring dimension at 0.09 weight, rebalanced all weights to sum to 1.0 (`src/kandal/scoring/engine.py`)
+- **Profile summary confirmation** — After profiling, generates a summary for the user to confirm before locking in. Handles corrections via re-extraction.
+- **Extended extraction** — Extracts gender_preference, cultural_preferences, birth_date, birth_time_approx, birth_city from conversation (`src/kandal/profiling/extractor.py`)
+- **Extended models** — Added birth fields to Profile, cultural_preferences to Preferences, optional fields to InferredTraits
+- **DB migration** — `00004_bazi_and_preferences.sql`: birth_date/time/city on profiles, cultural_preferences on preferences
+- **SMS handler updates** — Supports `awaiting_confirmation` state, persists birth info and new preference fields
+
 ## Current State
 
 | Component | Status |
 |-----------|--------|
 | SMS onboarding | Live — text START to +12605973322 |
 | Profile + trait creation | Working end-to-end |
-| Scoring engine (9 dimensions) | Complete |
+| Scoring engine (10 dimensions) | Complete — includes Bazi compatibility |
+| Bazi (Four Pillars) matching | Complete — pure function, graceful degradation |
+| Profiling conversation | Overhauled — alter ego positioning, summary confirmation |
 | Batch matching | Runs daily + on-demand via API |
 | Vercel deployment | Live with auto-deploy |
 | Landing page | Live at kandal.app |

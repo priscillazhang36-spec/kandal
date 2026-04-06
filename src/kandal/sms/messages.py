@@ -40,6 +40,14 @@ BASICS_GENDER = "What's your gender? (e.g. male, female, nonbinary)"
 
 BASICS_GENDER_INVALID = "I didn't catch that. Just type: male, female, or nonbinary."
 
+BASICS_GENDER_PREFERENCE = (
+    "And who are you interested in? (e.g. male, female, or both)"
+)
+
+BASICS_GENDER_PREFERENCE_INVALID = (
+    "Just type: male, female, nonbinary, or a combo like 'male and female'."
+)
+
 BASICS_CITY = "Last one -- what city are you in?"
 
 ONBOARDING_COMPLETE = (
