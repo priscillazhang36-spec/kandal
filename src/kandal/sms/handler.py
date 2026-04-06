@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+from kandal.core.config import get_settings
 from kandal.core.supabase import get_supabase
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,16 @@ from kandal.models.onboarding import OnboardingSession
 from kandal.questionnaire import QUESTIONS, infer_traits
 from kandal.sms import messages
 from kandal.sms.service import send_sms
+
+def _alert_admin(msg: str) -> None:
+    """Send an SMS alert to the admin phone if configured."""
+    try:
+        admin_phone = get_settings().admin_phone
+        if admin_phone:
+            send_sms(admin_phone, f"[Kandal Alert] {msg}")
+    except Exception as e:
+        logger.error("Failed to send admin alert: %s", e)
+
 
 LETTER_MAP = {"a": 0, "b": 1, "c": 2, "d": 3}
 VALID_GENDERS = {"male", "female", "nonbinary"}
@@ -99,6 +110,7 @@ def _finalize(session: OnboardingSession) -> bool:
         ).execute()
     except Exception as e:
         logger.error("Failed to save profile for %s: %s", session.phone, e)
+        _alert_admin(f"Profile save failed for {session.phone}: {e}")
         return False
 
     # Gender preference: conversation-extracted takes priority, basics-collected as fallback
@@ -126,6 +138,7 @@ def _finalize(session: OnboardingSession) -> bool:
         ).execute()
     except Exception as e:
         logger.error("Failed to save preferences for %s: %s", session.phone, e)
+        _alert_admin(f"Preferences save failed for {session.phone}: {e}")
         return False
 
     # Generate and store embedding if we have a narrative (non-critical)
