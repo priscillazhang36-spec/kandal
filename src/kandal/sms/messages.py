@@ -55,6 +55,11 @@ ONBOARDING_COMPLETE = (
     "We'll text you when we find someone worth meeting."
 )
 
+FINALIZE_FAILED = (
+    "Hmm, something went wrong saving your profile. "
+    "Don't worry — your answers are safe. Text RETRY and we'll try again."
+)
+
 ALREADY_COMPLETE = "You're already set up! We'll text you when we find a match."
 
 SESSION_EXPIRED = "Your session expired. Text START to begin again."

@@ -43,8 +43,12 @@ def _save_session(session: OnboardingSession) -> None:
     client.table("onboarding_sessions").update(data).eq("id", str(session.id)).execute()
 
 
-def _finalize(session: OnboardingSession) -> None:
-    """Infer traits (from adaptive profiling or fixed questionnaire), update profile, create preferences."""
+def _finalize(session: OnboardingSession) -> bool:
+    """Infer traits and save profile + preferences to DB.
+
+    Returns True if core data (profile + preferences) saved successfully,
+    False if something critical failed.
+    """
     client = get_supabase()
 
     # Check if we have adaptive profiling results
@@ -89,9 +93,13 @@ def _finalize(session: OnboardingSession) -> None:
     if traits.birth_city:
         profile_update["birth_city"] = traits.birth_city
 
-    client.table("profiles").update(profile_update).eq(
-        "id", str(session.profile_id)
-    ).execute()
+    try:
+        client.table("profiles").update(profile_update).eq(
+            "id", str(session.profile_id)
+        ).execute()
+    except Exception as e:
+        logger.error("Failed to save profile for %s: %s", session.phone, e)
+        return False
 
     # Gender preference: conversation-extracted takes priority, basics-collected as fallback
     gender_pref = traits.gender_preference or session.collected_basics.get("gender_preference")
@@ -111,12 +119,16 @@ def _finalize(session: OnboardingSession) -> None:
     if traits.dimension_weights:
         prefs_data["dimension_weights"] = traits.dimension_weights
 
-    client.table("preferences").upsert(
-        prefs_data,
-        on_conflict="profile_id",
-    ).execute()
+    try:
+        client.table("preferences").upsert(
+            prefs_data,
+            on_conflict="profile_id",
+        ).execute()
+    except Exception as e:
+        logger.error("Failed to save preferences for %s: %s", session.phone, e)
+        return False
 
-    # Generate and store embedding if we have a narrative
+    # Generate and store embedding if we have a narrative (non-critical)
     if narrative:
         try:
             from kandal.profiling.embeddings import embed_narrative, store_narrative_and_embedding
@@ -125,6 +137,8 @@ def _finalize(session: OnboardingSession) -> None:
             store_narrative_and_embedding(session.profile_id, narrative, embedding)
         except Exception as e:
             logger.warning("Failed to generate embedding: %s", e)
+
+    return True
 
 
 def _handle_awaiting_code(session: OnboardingSession, body: str) -> str:
@@ -353,8 +367,12 @@ def _handle_collecting_city(session: OnboardingSession, body: str) -> str:
     session.collected_basics["city"] = city
     session.state = "complete"
     _save_session(session)
-    _finalize(session)
-    return messages.ONBOARDING_COMPLETE
+    if _finalize(session):
+        return messages.ONBOARDING_COMPLETE
+    else:
+        session.state = "finalize_failed"
+        _save_session(session)
+        return messages.FINALIZE_FAILED
 
 
 def route_message(phone: str, body: str) -> str:
@@ -383,6 +401,16 @@ def route_message(phone: str, body: str) -> str:
         reply = _handle_collecting_gender_preference(session, body)
     elif state == "collecting_city":
         reply = _handle_collecting_city(session, body)
+    elif state == "finalize_failed":
+        if body.strip().lower() == "retry":
+            if _finalize(session):
+                session.state = "complete"
+                _save_session(session)
+                reply = messages.ONBOARDING_COMPLETE
+            else:
+                reply = messages.FINALIZE_FAILED
+        else:
+            reply = messages.FINALIZE_FAILED
     elif state == "complete":
         reply = messages.ALREADY_COMPLETE
     elif state == "expired":
