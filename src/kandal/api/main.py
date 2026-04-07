@@ -1,12 +1,22 @@
 import logging
 
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 from kandal.api.landing import LANDING_HTML
 from kandal.api.routes import auth, chat, matches, profiles
+from kandal.core.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
+
+_settings = get_settings()
+if _settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=_settings.sentry_dsn,
+        traces_sample_rate=0.0,
+        send_default_pii=False,
+    )
 
 app = FastAPI(title="Kandal", version="0.1.0")
 app.include_router(profiles.router, prefix="/profiles", tags=["profiles"])

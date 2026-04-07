@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
+from kandal.core.alerts import critical_alert
 from kandal.core.supabase import get_supabase
 from kandal.schemas.match import MatchResponse
 from kandal.scripts.match import run_batch
@@ -12,15 +13,23 @@ router = APIRouter()
 @router.post("/run")
 def trigger_matching():
     """Run the batch matching pipeline. Called by Vercel cron or manually."""
-    result = run_batch()
-    return result
+    try:
+        result = run_batch()
+        return result
+    except Exception as e:
+        critical_alert(f"Daily matching cron failed: {e}", e)
+        raise
 
 
 @router.post("/rescue")
 def rescue_conversations():
     """Rescue abandoned profiling conversations. Called by Vercel cron or manually."""
-    from kandal.profiling.rescue import rescue_stale_conversations
-    return rescue_stale_conversations()
+    try:
+        from kandal.profiling.rescue import rescue_stale_conversations
+        return rescue_stale_conversations()
+    except Exception as e:
+        critical_alert(f"Rescue cron failed: {e}", e)
+        raise
 
 
 @router.get("/{profile_id}", response_model=list[MatchResponse])

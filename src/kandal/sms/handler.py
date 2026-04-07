@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+from kandal.core.alerts import critical_alert
 from kandal.core.config import get_settings
 from kandal.core.supabase import get_supabase
 
@@ -15,15 +16,6 @@ from kandal.models.onboarding import OnboardingSession
 from kandal.questionnaire import QUESTIONS, infer_traits
 from kandal.sms import messages
 from kandal.sms.service import send_sms
-
-def _alert_admin(msg: str) -> None:
-    """Send an SMS alert to the admin phone if configured."""
-    try:
-        admin_phone = get_settings().admin_phone
-        if admin_phone:
-            send_sms(admin_phone, f"[Kandal Alert] {msg}")
-    except Exception as e:
-        logger.error("Failed to send admin alert: %s", e)
 
 
 LETTER_MAP = {"a": 0, "b": 1, "c": 2, "d": 3}
@@ -114,7 +106,7 @@ def _finalize(session: OnboardingSession) -> bool:
         ).execute()
     except Exception as e:
         logger.error("Failed to save profile for %s: %s", session.phone, e)
-        _alert_admin(f"Profile save failed for {session.phone}: {e}")
+        critical_alert(f"Profile save failed for {session.phone}: {e}", e)
         return False
 
     # Gender preference: conversation-extracted takes priority, basics-collected as fallback
@@ -142,7 +134,7 @@ def _finalize(session: OnboardingSession) -> bool:
         ).execute()
     except Exception as e:
         logger.error("Failed to save preferences for %s: %s", session.phone, e)
-        _alert_admin(f"Preferences save failed for {session.phone}: {e}")
+        critical_alert(f"Preferences save failed for {session.phone}: {e}", e)
         return False
 
     # Generate and store embeddings (non-critical)
@@ -266,7 +258,7 @@ def _handle_awaiting_code(session: OnboardingSession, body: str) -> str:
             _save_session(session)
             return opening
         except Exception as e:
-            logger.warning("Adaptive profiling unavailable, falling back to fixed questions: %s", e)
+            logger.error("Adaptive profiling unavailable, falling back to fixed questions: %s", e)
             session.state = "onboarding_q1"
             _save_session(session)
             q_text = messages.format_question(QUESTIONS[0])
@@ -368,7 +360,7 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
         return turn.reply
 
     except Exception as e:
-        logger.warning("Adaptive profiling failed mid-conversation: %s", e)
+        logger.error("Adaptive profiling failed mid-conversation: %s", e)
         # Fall back to fixed questions from the beginning
         session.state = "onboarding_q1"
         session.conversation_id = None
@@ -549,4 +541,5 @@ def route_message(phone: str, body: str) -> str:
         send_sms(phone, reply)
     except Exception as e:
         logger.error("send_sms failed: %s", e)
+        critical_alert(f"SMS reply failed for {phone} in state={state}", e)
     return reply

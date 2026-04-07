@@ -323,7 +323,7 @@ def assess_coverage(messages: list[dict]) -> dict[str, float]:
     try:
         data = _parse_json_response(response.content[0].text)
     except (json.JSONDecodeError, IndexError):
-        logger.warning("Failed to parse coverage response")
+        logger.error("Failed to parse coverage response: %s", response.content[0].text[:200])
         return {dim: 0.0 for dim in TRAIT_DIMENSIONS}
 
     coverage = {}

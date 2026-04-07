@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     twilio_phone_number: str = ""
     anthropic_api_key: str = ""
     voyageai_api_key: str = ""
+    sentry_dsn: str = ""
     admin_phone: str = ""
 
     model_config = {"env_file": ".env"}

@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
+import sentry_sdk
 from fastapi import APIRouter, HTTPException, Request, Response
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,8 @@ def start_phone_auth(body: PhoneAuthRequest):
 
         send_sms(body.phone, opening)
     except Exception as e:
-        logger.warning("Adaptive profiling unavailable, falling back to fixed questions: %s", e)
+        logger.error("Adaptive profiling unavailable, falling back to fixed questions: %s", e)
+        sentry_sdk.capture_exception(e)
 
         client.table("onboarding_sessions").upsert(
             {

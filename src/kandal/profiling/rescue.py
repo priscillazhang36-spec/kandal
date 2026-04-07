@@ -3,6 +3,8 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
+import sentry_sdk
+
 from kandal.core.supabase import get_supabase
 from kandal.profiling.extractor import extract_traits
 from kandal.profiling.embeddings import embed_narrative, store_narrative_and_embedding
@@ -74,6 +76,8 @@ def rescue_stale_conversations() -> dict:
 
         except Exception as e:
             logger.error("Failed to rescue conversation %s: %s", conv["id"], e)
+            sentry_sdk.set_context("rescue", {"conversation_id": conv["id"]})
+            sentry_sdk.capture_exception(e)
             client.table("profiling_conversations").update({
                 "status": "rescue_failed",
             }).eq("id", conv["id"]).execute()
