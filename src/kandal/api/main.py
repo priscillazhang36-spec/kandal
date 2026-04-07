@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 from kandal.api.landing import LANDING_HTML
+from kandal.api.legal import PRIVACY_HTML, TERMS_HTML
 from kandal.api.routes import auth, chat, matches, profiles
 from kandal.core.config import get_settings
 
@@ -28,6 +29,16 @@ app.include_router(chat.router, tags=["chat"])
 @app.get("/", response_class=HTMLResponse)
 def landing():
     return LANDING_HTML
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy():
+    return PRIVACY_HTML
+
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms():
+    return TERMS_HTML
 
 
 @app.get("/health")

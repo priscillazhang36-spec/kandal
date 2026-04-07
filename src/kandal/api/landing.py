@@ -127,8 +127,16 @@ LANDING_HTML = r'''<!DOCTYPE html>
     .start-btn:active { opacity: 0.7; }
     .start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .form-hint {
-      font-size: 0.7rem; color: rgba(245,234,214,0.3); margin-top: 0.6rem;
+    .consent-label {
+      display: flex; gap: 0.5rem; align-items: flex-start;
+      font-size: 0.7rem; color: rgba(245,234,214,0.4); line-height: 1.5;
+      cursor: pointer; text-align: left;
+    }
+    .consent-label input[type="checkbox"] {
+      margin-top: 0.2rem; flex-shrink: 0; accent-color: #f5ead6;
+    }
+    .consent-label a {
+      color: rgba(245,234,214,0.6); text-decoration: underline;
     }
 
     footer {
@@ -270,13 +278,18 @@ LANDING_HTML = r'''<!DOCTYPE html>
             <input type="tel" inputmode="tel" class="phone-input" id="phone"
               placeholder="Your number" autocomplete="tel-national" required>
           </div>
+          <label class="consent-label">
+            <input type="checkbox" id="consent-check" required>
+            <span>By checking this box, I agree to receive SMS messages from Kandal about my matchmaking profile. Message frequency varies. Message &amp; data rates may apply. Reply STOP to unsubscribe, HELP for help. I agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span>
+          </label>
           <button type="submit" class="start-btn" id="start-btn">Let's go</button>
         </form>
-        <p class="form-hint">We'll use this to find you later. Chat happens right here.</p>
         <div class="form-error" id="form-error"></div>
       </div>
     </main>
-    <footer><p>kandal &copy; 2026</p></footer>
+    <footer>
+      <p>kandal &copy; 2026 &nbsp;|&nbsp; <a href="/privacy" style="color:rgba(245,234,214,0.3);text-decoration:none;">Privacy</a> &nbsp;|&nbsp; <a href="/terms" style="color:rgba(245,234,214,0.3);text-decoration:none;">Terms</a></p>
+    </footer>
   </div>
 
   <!-- Chat -->
