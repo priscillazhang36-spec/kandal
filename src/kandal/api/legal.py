@@ -58,7 +58,7 @@ PRIVACY_HTML = r'''<!DOCTYPE html>
   </ul>
 
   <h2>5. Data Retention</h2>
-  <p>We retain your data for as long as your account is active. You may request deletion of your data at any time by contacting us at priscillazhang36@gmail.com.</p>
+  <p>We retain your data for as long as your account is active. You may request deletion of your data at any time by contacting us at customersupport@kandal.com.</p>
 
   <h2>6. Security</h2>
   <p>We use industry-standard measures to protect your data, including encrypted database connections, secure API keys, and HTTPS for all communications.</p>
@@ -67,7 +67,7 @@ PRIVACY_HTML = r'''<!DOCTYPE html>
   <p>We may update this policy from time to time. Changes will be posted on this page with an updated date.</p>
 
   <h2>8. Contact</h2>
-  <p>Questions? Email us at <a href="mailto:priscillazhang36@gmail.com">priscillazhang36@gmail.com</a>.</p>
+  <p>Questions? Email us at <a href="mailto:customersupport@kandal.com">customersupport@kandal.com</a>.</p>
 </body>
 </html>'''
 
@@ -134,7 +134,7 @@ TERMS_HTML = r'''<!DOCTYPE html>
   <p>Your use of the Service is also governed by our <a href="/privacy">Privacy Policy</a>.</p>
 
   <h2>7. Termination</h2>
-  <p>We may suspend or terminate your access at any time for violation of these terms. You may delete your account by contacting us at priscillazhang36@gmail.com.</p>
+  <p>We may suspend or terminate your access at any time for violation of these terms. You may delete your account by contacting us at customersupport@kandal.com.</p>
 
   <h2>8. Disclaimer</h2>
   <p>The Service is provided "as is" without warranties of any kind. We are not liable for any damages arising from your use of the Service.</p>
@@ -143,6 +143,6 @@ TERMS_HTML = r'''<!DOCTYPE html>
   <p>We may update these terms from time to time. Continued use of the Service after changes constitutes acceptance.</p>
 
   <h2>10. Contact</h2>
-  <p>Questions? Email us at <a href="mailto:priscillazhang36@gmail.com">priscillazhang36@gmail.com</a>.</p>
+  <p>Questions? Email us at <a href="mailto:customersupport@kandal.com">customersupport@kandal.com</a>.</p>
 </body>
 </html>'''
