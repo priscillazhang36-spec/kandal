@@ -24,8 +24,8 @@ def test_attachment_anxious_avoidant():
     assert _score_attachment_style(_prefs(attachment_style="anxious"), _prefs(attachment_style="avoidant")) == 0.0
 
 
-def test_attachment_none_returns_neutral():
-    assert _score_attachment_style(_prefs(attachment_style=None), _prefs(attachment_style="secure")) == 0.5
+def test_attachment_none_returns_none():
+    assert _score_attachment_style(_prefs(attachment_style=None), _prefs(attachment_style="secure")) is None
 
 
 def test_attachment_matrix_symmetric():
@@ -46,8 +46,8 @@ def test_conflict_avoidant_talk_immediately():
     assert _score_conflict_style(_prefs(conflict_style="avoidant"), _prefs(conflict_style="talk_immediately")) == 0.1
 
 
-def test_conflict_none_returns_neutral():
-    assert _score_conflict_style(_prefs(conflict_style=None), _prefs(conflict_style="collaborative")) == 0.5
+def test_conflict_none_returns_none():
+    assert _score_conflict_style(_prefs(conflict_style=None), _prefs(conflict_style="collaborative")) is None
 
 
 # --- Love language ---
@@ -73,8 +73,8 @@ def test_love_language_mismatch():
     assert score == 0.10  # both directions: top giving is last in receiving
 
 
-def test_love_language_empty_returns_neutral():
-    assert _score_love_language_fit(_prefs(), _prefs(love_language_giving=LANGS, love_language_receiving=LANGS)) == 0.5
+def test_love_language_empty_returns_none():
+    assert _score_love_language_fit(_prefs(), _prefs(love_language_giving=LANGS, love_language_receiving=LANGS)) is None
 
 
 # --- Relationship history ---
@@ -93,5 +93,5 @@ def test_relationship_history_one_step():
     assert abs(score - 2 / 3) < 0.001
 
 
-def test_relationship_history_none_returns_neutral():
-    assert _score_relationship_history(_prefs(relationship_history=None), _prefs(relationship_history="long_term")) == 0.5
+def test_relationship_history_none_returns_none():
+    assert _score_relationship_history(_prefs(relationship_history=None), _prefs(relationship_history="long_term")) is None

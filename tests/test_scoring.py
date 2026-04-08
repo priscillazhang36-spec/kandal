@@ -60,13 +60,14 @@ def test_partial_overlap(make_user):
 
 
 def test_empty_profiles(make_user):
-    """No data at all — everything returns neutral 0.5, except comm_style (both balanced = 1.0)."""
+    """No data at all — all dimensions return None and get weight 0, total is 0."""
     pa, pref_a = make_user()
     pb, pref_b = make_user()
     result = score_compatibility(pa, pref_a, pb, pref_b)
-    # All dims return 0.5 (neutral) except comm_style (1.0 when both balanced)
-    # 0.5 * (1.0 - 0.03) + 1.0 * 0.03 = 0.485 + 0.03 = 0.515
-    assert abs(result.total_score - 0.515) < 0.001
+    assert result.total_score == 0.0
+    # All dimensions should have weight 0 (no data)
+    for d in result.breakdown:
+        assert d.weight == 0.0
 
 
 def test_communication_balanced_wildcard(make_user):
@@ -74,7 +75,7 @@ def test_communication_balanced_wildcard(make_user):
     pb, pref_b = make_user(communication_style="texter")
     result = score_compatibility(pa, pref_a, pb, pref_b)
     comm_dim = next(d for d in result.breakdown if d.dimension == "communication_style")
-    assert comm_dim.score == 0.5
+    assert comm_dim.score == 0.0
 
 
 def test_weights_sum_to_one():

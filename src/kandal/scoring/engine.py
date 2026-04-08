@@ -38,11 +38,11 @@ DIMENSION_WEIGHTS: dict[str, dict] = {
 }
 
 
-def _jaccard(a: list[str], b: list[str]) -> float:
-    """Jaccard similarity. Returns 0.5 when both are empty (neutral)."""
+def _jaccard(a: list[str], b: list[str]) -> float | None:
+    """Jaccard similarity. Returns None when both are empty (no data)."""
     sa, sb = set(a), set(b)
     if not sa and not sb:
-        return 0.5
+        return None
     union = sa | sb
     return len(sa & sb) / len(union)
 
@@ -50,27 +50,32 @@ def _jaccard(a: list[str], b: list[str]) -> float:
 # --- Tier 1 scoring functions ---
 
 
-def _score_interest_overlap(prefs_a: Preferences, prefs_b: Preferences) -> float:
+def _score_interest_overlap(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
     return _jaccard(prefs_a.interests, prefs_b.interests)
 
 
-def _score_personality_match(prefs_a: Preferences, prefs_b: Preferences) -> float:
+def _score_personality_match(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
     return _jaccard(prefs_a.personality, prefs_b.personality)
 
 
-def _score_values_alignment(prefs_a: Preferences, prefs_b: Preferences) -> float:
+def _score_values_alignment(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
     return _jaccard(prefs_a.values, prefs_b.values)
 
 
-def _score_communication_style(prefs_a: Preferences, prefs_b: Preferences) -> float:
-    if prefs_a.communication_style == prefs_b.communication_style:
+def _score_communication_style(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
+    a, b = prefs_a.communication_style, prefs_b.communication_style
+    # Both default = no signal
+    if a == "balanced" and b == "balanced":
+        return None
+    if a == b:
         return 1.0
-    if "balanced" in (prefs_a.communication_style, prefs_b.communication_style):
-        return 0.5
+    # One is default, other is set — no real comparison
+    if "balanced" in (a, b):
+        return None
     return 0.0
 
 
-def _score_lifestyle_signals(prefs_a: Preferences, prefs_b: Preferences) -> float:
+def _score_lifestyle_signals(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
     return _jaccard(prefs_a.lifestyle, prefs_b.lifestyle)
 
 
@@ -90,31 +95,34 @@ ATTACHMENT_MATRIX = {
 }
 
 
-def _score_attachment_style(prefs_a: Preferences, prefs_b: Preferences) -> float:
+def _score_attachment_style(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
     a, b = prefs_a.attachment_style, prefs_b.attachment_style
     if a is None or b is None:
-        return 0.5
+        return None
     pair = (a, b) if (a, b) in ATTACHMENT_MATRIX else (b, a)
-    return ATTACHMENT_MATRIX.get(pair, 0.5)
+    return ATTACHMENT_MATRIX.get(pair, None)
 
 
 _LOVE_LANG_RANK_SCORES = {0: 1.0, 1: 0.75, 2: 0.50, 3: 0.25, 4: 0.10}
 
 
-def _love_direction_score(giving: list[str], receiving: list[str]) -> float:
+def _love_direction_score(giving: list[str], receiving: list[str]) -> float | None:
     """How well does the giver's #1 language land in the receiver's ranking?"""
     if not giving or not receiving:
-        return 0.5
+        return None
     top_give = giving[0]
     if top_give in receiving:
         return _LOVE_LANG_RANK_SCORES.get(receiving.index(top_give), 0.10)
     return 0.10
 
 
-def _score_love_language_fit(prefs_a: Preferences, prefs_b: Preferences) -> float:
+def _score_love_language_fit(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
     a_to_b = _love_direction_score(prefs_a.love_language_giving, prefs_b.love_language_receiving)
     b_to_a = _love_direction_score(prefs_b.love_language_giving, prefs_a.love_language_receiving)
-    return (a_to_b + b_to_a) / 2
+    scores = [s for s in (a_to_b, b_to_a) if s is not None]
+    if not scores:
+        return None
+    return sum(scores) / len(scores)
 
 
 CONFLICT_MATRIX = {
@@ -131,12 +139,12 @@ CONFLICT_MATRIX = {
 }
 
 
-def _score_conflict_style(prefs_a: Preferences, prefs_b: Preferences) -> float:
+def _score_conflict_style(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
     a, b = prefs_a.conflict_style, prefs_b.conflict_style
     if a is None or b is None:
-        return 0.5
+        return None
     pair = (a, b) if (a, b) in CONFLICT_MATRIX else (b, a)
-    return CONFLICT_MATRIX.get(pair, 0.5)
+    return CONFLICT_MATRIX.get(pair, None)
 
 
 _HISTORY_ORDINAL = {
@@ -147,10 +155,10 @@ _HISTORY_ORDINAL = {
 }
 
 
-def _score_relationship_history(prefs_a: Preferences, prefs_b: Preferences) -> float:
+def _score_relationship_history(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
     a, b = prefs_a.relationship_history, prefs_b.relationship_history
     if a is None or b is None:
-        return 0.5
+        return None
     return 1.0 - abs(_HISTORY_ORDINAL.get(a, 1) - _HISTORY_ORDINAL.get(b, 1)) / 3
 
 
@@ -183,10 +191,10 @@ def _parse_approx_hour(approx: str | None) -> int | None:
 
 def _score_bazi_compatibility(
     profile_a: Profile, profile_b: Profile,
-) -> float:
-    """Score Bazi compatibility. Returns 0.5 (neutral) if either lacks birth data."""
+) -> float | None:
+    """Score Bazi compatibility. Returns None if either lacks birth data."""
     if not profile_a.birth_date or not profile_b.birth_date:
-        return 0.5
+        return None
 
     from kandal.scoring.bazi import compute_bazi_profile, score_bazi_compatibility
 
@@ -210,11 +218,11 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return (dot / (norm_a * norm_b) + 1) / 2
 
 
-def _score_emotional_fit(profile_a: Profile, profile_b: Profile) -> float:
+def _score_emotional_fit(profile_a: Profile, profile_b: Profile) -> float | None:
     """Score emotional fit by cross-comparing giving/needs embeddings.
 
     A's giving style is compared to B's needs, and vice versa.
-    Returns 0.5 (neutral) if either user lacks embeddings.
+    Returns None if neither direction has data.
     """
     a_giving = profile_a.emotional_giving_embedding
     a_needs = profile_a.emotional_needs_embedding
@@ -230,7 +238,7 @@ def _score_emotional_fit(profile_a: Profile, profile_b: Profile) -> float:
         scores.append(_cosine_similarity(b_giving, a_needs))
 
     if not scores:
-        return 0.5  # neutral when data is missing
+        return None
 
     return sum(scores) / len(scores)
 
@@ -238,8 +246,8 @@ def _score_emotional_fit(profile_a: Profile, profile_b: Profile) -> float:
 def _compute_raw_scores(
     profile_a: Profile, prefs_a: Preferences,
     profile_b: Profile, prefs_b: Preferences,
-) -> dict[str, float]:
-    """Compute raw (unweighted) score for each dimension. Pure function."""
+) -> dict[str, float | None]:
+    """Compute raw (unweighted) score for each dimension. Returns None for missing data."""
     raw_scores = {}
     for dim_name in DIMENSION_WEIGHTS:
         if dim_name == "bazi_compatibility":
@@ -258,26 +266,37 @@ def score_compatibility(
     prefs_b: Preferences,
     perspective_weights: dict[str, float] | None = None,
 ) -> ScoringResult:
-    """Compute weighted compatibility score across all dimensions.
+    """Compute weighted compatibility score across dimensions with data.
 
-    If perspective_weights is provided, uses those instead of global defaults.
-    This allows each user to have personalized scoring priorities.
+    Dimensions where either user has no data are excluded, and their weight
+    is redistributed proportionally across scored dimensions.
     """
     raw_scores = _compute_raw_scores(profile_a, prefs_a, profile_b, prefs_b)
-    weights = perspective_weights or {k: v["weight"] for k, v in DIMENSION_WEIGHTS.items()}
+    base_weights = perspective_weights or {k: v["weight"] for k, v in DIMENSION_WEIGHTS.items()}
+
+    # Separate scored vs skipped dimensions
+    scored_dims = {k: v for k, v in raw_scores.items() if v is not None}
+    skipped_dims = {k for k, v in raw_scores.items() if v is None}
+
+    # Redistribute skipped weight proportionally across scored dimensions
+    scored_weight_sum = sum(base_weights.get(k, 0) for k in scored_dims)
+    if scored_weight_sum > 0:
+        scale = 1.0 / scored_weight_sum
+    else:
+        scale = 0.0
 
     breakdown = []
     total = 0.0
     for dim_name, meta in DIMENSION_WEIGHTS.items():
         raw = raw_scores[dim_name]
-        w = weights.get(dim_name, meta["weight"])
-        breakdown.append(
-            DimensionScore(
-                dimension=dim_name,
-                score=raw,
-                weight=w,
-                tier=meta["tier"],
+        if raw is None:
+            breakdown.append(
+                DimensionScore(dimension=dim_name, score=0.0, weight=0.0, tier=meta["tier"])
             )
+            continue
+        w = base_weights.get(dim_name, meta["weight"]) * scale
+        breakdown.append(
+            DimensionScore(dimension=dim_name, score=raw, weight=round(w, 4), tier=meta["tier"])
         )
         total += raw * w
     return ScoringResult(total_score=round(total, 4), breakdown=breakdown)
