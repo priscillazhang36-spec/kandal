@@ -233,6 +233,19 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
 
     narrative = data.get("narrative", "")
 
+    # Basic info
+    extracted_name = data.get("name")
+    if not isinstance(extracted_name, str) or not extracted_name.strip():
+        extracted_name = None
+
+    extracted_gender = data.get("gender")
+    if extracted_gender not in VALID_GENDERS:
+        extracted_gender = None
+
+    current_city = data.get("current_city")
+    if not isinstance(current_city, str) or not current_city.strip():
+        current_city = None
+
     # Validate new fields
     gender_pref = data.get("gender_preference")
     if gender_pref is not None:
@@ -315,6 +328,9 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
         love_language_receiving=receiving,
         conflict_style=conflict,
         relationship_history=history,
+        name=extracted_name,
+        gender=extracted_gender,
+        current_city=current_city,
         gender_preference=gender_pref,
         cultural_preferences=cultural_prefs,
         birth_date=birth_date,

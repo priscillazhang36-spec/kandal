@@ -194,6 +194,10 @@ def _prefill_basics_from_traits(session: OnboardingSession) -> None:
 
     traits = conv_resp.data[0]["extracted_traits"]
 
+    # Name
+    if traits.get("name") and "name" not in session.collected_basics:
+        session.collected_basics["name"] = traits["name"].strip()
+
     # Age from birth_date
     if traits.get("birth_date") and "age" not in session.collected_basics:
         try:
@@ -206,9 +210,19 @@ def _prefill_basics_from_traits(session: OnboardingSession) -> None:
         except (ValueError, TypeError):
             pass
 
+    # Gender
+    if traits.get("gender") and "gender" not in session.collected_basics:
+        gender = traits["gender"].strip().lower()
+        if gender in VALID_GENDERS:
+            session.collected_basics["gender"] = gender
+
     # Gender preference
     if traits.get("gender_preference") and "gender_preference" not in session.collected_basics:
         session.collected_basics["gender_preference"] = traits["gender_preference"]
+
+    # City
+    if traits.get("current_city") and "city" not in session.collected_basics:
+        session.collected_basics["city"] = traits["current_city"].strip()
 
 
 def _next_missing_basic(session: OnboardingSession) -> tuple[str, str]:

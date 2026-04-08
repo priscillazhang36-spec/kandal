@@ -29,6 +29,10 @@ class InferredTraits(BaseModel):
     love_language_receiving: list[str]
     conflict_style: str
     relationship_history: str
+    # Basic info extracted from conversation (optional)
+    name: str | None = None
+    gender: str | None = None
+    current_city: str | None = None
     # Extended fields from adaptive profiling (optional for backward compat)
     gender_preference: list[str] | None = None
     cultural_preferences: list[str] | None = None
