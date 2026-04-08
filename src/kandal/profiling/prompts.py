@@ -36,6 +36,7 @@ TRAIT_DIMENSIONS = [
     "birth_info",
     "matching_priorities",
     "emotional_dynamics",
+    "interests_and_lifestyle",
 ]
 
 CONVERSATION_SYSTEM_PROMPT = """\
@@ -222,7 +223,8 @@ Return valid JSON:
   "partner_preferences": <float 0-1>,
   "birth_info": <float 0-1>,
   "matching_priorities": <float 0-1>,
-  "emotional_dynamics": <float 0-1>
+  "emotional_dynamics": <float 0-1>,
+  "interests_and_lifestyle": <float 0-1>
 }
 
 0.0 = no signal at all, 0.5 = some hints, 0.7 = fairly confident, 1.0 = very clear.
@@ -233,6 +235,8 @@ matching_priorities = whether we know what they value most in a match (shared in
 emotional compatibility, conflict handling, destiny/bazi, values, etc).
 emotional_dynamics = whether we understand how this person makes partners feel AND what \
 they need to feel from a partner. Both sides needed for high confidence.
+interests_and_lifestyle = whether we know their hobbies, interests, what they do for fun, \
+and lifestyle signals (homebody vs social, early bird vs night owl, active vs relaxed, etc).
 """
 
 SUMMARY_SYSTEM_PROMPT = """\
@@ -281,7 +285,7 @@ def build_conversation_prompt(
     if ratio < 0.3:
         phase_hint = "You are in PHASE 1. You MUST collect: birthday, birth time, birthplace, gender preference, and cultural preferences before moving to deeper questions. Bundle these naturally into your messages. Do not spend multiple exchanges on small talk without asking basics."
     elif ratio < 0.8:
-        phase_hint = "You are in PHASE 2 (going deeper). Basic info should be collected by now. Focus on emotional dynamics (how they make partners feel, what they need to feel), love languages, conflict, attachment, relationship history."
+        phase_hint = "You are in PHASE 2 (going deeper). Basic info should be collected by now. Focus on emotional dynamics (how they make partners feel, what they need to feel), love languages, conflict, attachment, relationship history. ALSO make sure to ask about their hobbies, interests, and lifestyle (what they do for fun, homebody vs social, typical weekend, etc.) — these are critical for matching."
     else:
         phase_hint = "You are in PHASE 3 (priorities). Focus on what matters most to them in a match, and fill any remaining coverage gaps."
 
