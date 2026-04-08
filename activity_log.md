@@ -73,19 +73,36 @@
 - **DB migration** — `00004_bazi_and_preferences.sql`: birth_date/time/city on profiles, cultural_preferences on preferences
 - **SMS handler updates** — Supports `awaiting_confirmation` state, persists birth info and new preference fields
 
+## Phase 7: Scoring Intelligence + Error Monitoring
+**What:** Made matching smarter with semantic similarity and cross-comparison, added Sentry error monitoring, legal pages for Twilio TFV, and cost optimization.
+
+- **Sentry error monitoring** — Auto-captures unhandled exceptions via FastAPI integration, `logger.error()` forwarding, hardened `critical_alert()` for wake-up failures (`src/kandal/core/alerts.py`)
+- **Semantic similarity scoring** — Replaced naive Jaccard with Voyage AI embeddings + cosine similarity for personality and values matching (`src/kandal/scoring/engine.py`)
+- **Cross-comparison matching** — Personality/values now scored as A's traits vs B's partner_wants (complementarity), not same-to-same overlap. Added `partner_personality`, `partner_values` fields end-to-end.
+- **Weight redistribution** — Dimensions with no data get weight 0, remaining weights scale proportionally instead of defaulting to 0.5
+- **Tier 1 tag extraction** — Interests, personality, values, lifestyle now extracted from profiling conversations and saved to preferences
+- **Coverage tracking** — Added `interests_and_lifestyle` dimension so profiling asks about hobbies
+- **Conversation flow overhaul** — Reordered phases (vibes first, basics last), removed structured response pattern, more natural tone
+- **Emotional fit scoring** — Added Tier 0 `emotional_fit` dimension (0.25 weight) comparing giving/needs narrative embeddings
+- **Legal pages** — Privacy policy and terms of service for Twilio toll-free verification (`src/kandal/api/legal.py`)
+- **Landing page consent** — Added opt-in checkbox with legal links for TFV compliance
+- **Cost optimization** — Switched `extract_traits` from Claude Sonnet to Haiku (~15x cost reduction)
+- **DB migration** — `00006_partner_preferences.sql`: partner_personality, partner_values columns on preferences
+
 ## Current State
 
 | Component | Status |
 |-----------|--------|
 | SMS onboarding | Live — text START to +12605973322 |
 | Profile + trait creation | Working end-to-end |
-| Scoring engine (10 dimensions) | Complete — includes Bazi compatibility |
+| Scoring engine (11 dimensions) | Complete — semantic similarity, cross-comparison, Bazi |
 | Bazi (Four Pillars) matching | Complete — pure function, graceful degradation |
 | Profiling conversation | Overhauled — alter ego positioning, summary confirmation |
 | Batch matching | Runs daily + on-demand via API |
 | Vercel deployment | Live with auto-deploy |
 | Landing page | Live at kandal.app |
 | Match notifications | Not yet built |
+| Error monitoring | Sentry + hardened SMS alerts |
 | Second test user | Needed to test matching |
 
 ## Tech Stack
