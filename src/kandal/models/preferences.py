@@ -13,7 +13,9 @@ class Preferences(BaseModel):
     relationship_types: list[str] = ["long_term"]
     interests: list[str] = []
     personality: list[str] = []
+    partner_personality: list[str] = []
     values: list[str] = []
+    partner_values: list[str] = []
     communication_style: str = "balanced"
     lifestyle: list[str] = []
     selectivity: str = "balanced"

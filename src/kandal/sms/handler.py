@@ -130,8 +130,12 @@ def _finalize(session: OnboardingSession) -> bool:
         prefs_data["interests"] = traits.interests
     if traits.personality:
         prefs_data["personality"] = traits.personality
+    if traits.partner_personality:
+        prefs_data["partner_personality"] = traits.partner_personality
     if traits.values:
         prefs_data["values"] = traits.values
+    if traits.partner_values:
+        prefs_data["partner_values"] = traits.partner_values
     if traits.lifestyle:
         prefs_data["lifestyle"] = traits.lifestyle
 

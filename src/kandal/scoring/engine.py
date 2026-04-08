@@ -47,6 +47,42 @@ def _jaccard(a: list[str], b: list[str]) -> float | None:
     return len(sa & sb) / len(union)
 
 
+def _embed_tags(tags: list[str]) -> list[float] | None:
+    """Embed a list of tags as a natural sentence via Voyage AI. Cached per session."""
+    if not tags:
+        return None
+    from kandal.profiling.embeddings import _get_client, EMBEDDING_MODEL
+    text = ", ".join(tags)
+    client = _get_client()
+    result = client.embed([text], model=EMBEDDING_MODEL)
+    return result.embeddings[0]
+
+
+# Module-level cache to avoid re-embedding the same tag list within a batch run
+_embed_cache: dict[str, list[float]] = {}
+
+
+def _embed_tags_cached(tags: list[str]) -> list[float] | None:
+    if not tags:
+        return None
+    key = "|".join(sorted(tags))
+    if key not in _embed_cache:
+        _embed_cache[key] = _embed_tags(tags)
+    return _embed_cache[key]
+
+
+def _semantic_similarity(a: list[str], b: list[str]) -> float | None:
+    """Cosine similarity between embedded tag lists. Falls back to Jaccard on error."""
+    try:
+        emb_a = _embed_tags_cached(a)
+        emb_b = _embed_tags_cached(b)
+        if emb_a is None or emb_b is None:
+            return None
+        return _cosine_similarity(emb_a, emb_b)
+    except Exception:
+        return _jaccard(a, b)
+
+
 # --- Tier 1 scoring functions ---
 
 
@@ -55,11 +91,37 @@ def _score_interest_overlap(prefs_a: Preferences, prefs_b: Preferences) -> float
 
 
 def _score_personality_match(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
-    return _jaccard(prefs_a.personality, prefs_b.personality)
+    """Cross-compare: does A's personality match what B wants, and vice versa?
+    Uses semantic similarity to catch near-matches like disciplined ≈ reliable."""
+    scores = []
+    # A's personality vs B's partner wants
+    if prefs_a.personality and prefs_b.partner_personality:
+        scores.append(_semantic_similarity(prefs_a.personality, prefs_b.partner_personality))
+    # B's personality vs A's partner wants
+    if prefs_b.personality and prefs_a.partner_personality:
+        scores.append(_semantic_similarity(prefs_b.personality, prefs_a.partner_personality))
+    valid = [s for s in scores if s is not None]
+    if valid:
+        return sum(valid) / len(valid)
+    # Fallback: semantic overlap if no partner prefs
+    return _semantic_similarity(prefs_a.personality, prefs_b.personality)
 
 
 def _score_values_alignment(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
-    return _jaccard(prefs_a.values, prefs_b.values)
+    """Cross-compare: does A's values match what B wants, and vice versa?
+    Uses semantic similarity to catch near-matches like trust ≈ reliability."""
+    scores = []
+    # A's values vs B's partner wants
+    if prefs_a.values and prefs_b.partner_values:
+        scores.append(_semantic_similarity(prefs_a.values, prefs_b.partner_values))
+    # B's values vs A's partner wants
+    if prefs_b.values and prefs_a.partner_values:
+        scores.append(_semantic_similarity(prefs_b.values, prefs_a.partner_values))
+    valid = [s for s in scores if s is not None]
+    if valid:
+        return sum(valid) / len(valid)
+    # Fallback: semantic overlap if no partner prefs
+    return _semantic_similarity(prefs_a.values, prefs_b.values)
 
 
 def _score_communication_style(prefs_a: Preferences, prefs_b: Preferences) -> float | None:

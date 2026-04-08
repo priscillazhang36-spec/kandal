@@ -189,14 +189,13 @@ def _parse_json_response(raw: str) -> dict:
 def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
     """Extract InferredTraits + narrative from a completed conversation.
 
-    Uses claude-sonnet-4-6 for accuracy on the final extraction.
     Returns (traits, narrative).
     """
     client = _get_client()
     conversation_text = _format_conversation(messages)
 
     response = client.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=1024,
         system=EXTRACTION_SYSTEM_PROMPT,
         messages=[
@@ -308,12 +307,26 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
         personality = [str(t).lower().strip() for t in personality if isinstance(t, str)]
         personality = personality or None
 
+    partner_personality = data.get("partner_personality")
+    if not isinstance(partner_personality, list):
+        partner_personality = None
+    else:
+        partner_personality = [str(t).lower().strip() for t in partner_personality if isinstance(t, str)]
+        partner_personality = partner_personality or None
+
     values = data.get("values")
     if not isinstance(values, list):
         values = None
     else:
         values = [str(t).lower().strip() for t in values if isinstance(t, str)]
         values = values or None
+
+    partner_values = data.get("partner_values")
+    if not isinstance(partner_values, list):
+        partner_values = None
+    else:
+        partner_values = [str(t).lower().strip() for t in partner_values if isinstance(t, str)]
+        partner_values = partner_values or None
 
     lifestyle = data.get("lifestyle")
     if not isinstance(lifestyle, list):
@@ -341,7 +354,9 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
         emotional_needs=emotional_needs,
         interests=interests,
         personality=personality,
+        partner_personality=partner_personality,
         values=values,
+        partner_values=partner_values,
         lifestyle=lifestyle,
     )
 

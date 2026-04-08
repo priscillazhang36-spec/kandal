@@ -46,7 +46,9 @@ class InferredTraits(BaseModel):
     # Tier 1 tag lists — extracted from conversation
     interests: list[str] | None = None
     personality: list[str] | None = None
+    partner_personality: list[str] | None = None
     values: list[str] | None = None
+    partner_values: list[str] | None = None
     lifestyle: list[str] | None = None
 
 
