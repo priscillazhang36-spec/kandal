@@ -1,7 +1,8 @@
+import json
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class Profile(BaseModel):
@@ -28,3 +29,15 @@ class Profile(BaseModel):
     emotional_needs_embedding: list[float] | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+    @field_validator(
+        "narrative_embedding",
+        "emotional_giving_embedding",
+        "emotional_needs_embedding",
+        mode="before",
+    )
+    @classmethod
+    def parse_embedding_string(cls, v: object) -> list[float] | None:
+        if isinstance(v, str):
+            return json.loads(v)
+        return v

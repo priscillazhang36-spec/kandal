@@ -1,7 +1,11 @@
+import logging
 import math
+import time
 from datetime import date
 
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 from kandal.models.preferences import Preferences
 from kandal.models.profile import Profile
@@ -47,15 +51,25 @@ def _jaccard(a: list[str], b: list[str]) -> float | None:
     return len(sa & sb) / len(union)
 
 
-def _embed_tags(tags: list[str]) -> list[float] | None:
-    """Embed a list of tags as a natural sentence via Voyage AI. Cached per session."""
+def _embed_tags(tags: list[str], max_retries: int = 3) -> list[float] | None:
+    """Embed a list of tags as a natural sentence via Voyage AI. Retries on rate limit."""
     if not tags:
         return None
     from kandal.profiling.embeddings import _get_client, EMBEDDING_MODEL
     text = ", ".join(tags)
     client = _get_client()
-    result = client.embed([text], model=EMBEDDING_MODEL)
-    return result.embeddings[0]
+    for attempt in range(max_retries):
+        try:
+            result = client.embed([text], model=EMBEDDING_MODEL)
+            return result.embeddings[0]
+        except Exception as e:
+            if "rate" in str(e).lower() and attempt < max_retries - 1:
+                wait = 20 * (attempt + 1)
+                logger.info(f"Rate limited, waiting {wait}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait)
+            else:
+                raise
+    return None
 
 
 # Module-level cache to avoid re-embedding the same tag list within a batch run
@@ -79,7 +93,8 @@ def _semantic_similarity(a: list[str], b: list[str]) -> float | None:
         if emb_a is None or emb_b is None:
             return None
         return _cosine_similarity(emb_a, emb_b)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Semantic similarity failed, falling back to Jaccard: {e}")
         return _jaccard(a, b)
 
 
@@ -87,7 +102,7 @@ def _semantic_similarity(a: list[str], b: list[str]) -> float | None:
 
 
 def _score_interest_overlap(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
-    return _jaccard(prefs_a.interests, prefs_b.interests)
+    return _semantic_similarity(prefs_a.interests, prefs_b.interests)
 
 
 def _score_personality_match(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
@@ -124,17 +139,41 @@ def _score_values_alignment(prefs_a: Preferences, prefs_b: Preferences) -> float
     return _semantic_similarity(prefs_a.values, prefs_b.values)
 
 
+_CONFLICT_TO_COMM: dict[str, str] = {
+    "talk_immediately": "direct",
+    "collaborative": "deliberate",
+    "need_space": "reserved",
+    "avoidant": "reserved",
+}
+
+COMM_STYLE_MATRIX = {
+    ("direct", "direct"): 1.0,
+    ("direct", "deliberate"): 0.7,
+    ("direct", "reserved"): 0.3,
+    ("deliberate", "deliberate"): 1.0,
+    ("deliberate", "reserved"): 0.5,
+    ("reserved", "reserved"): 0.8,
+}
+
+
+def _infer_communication_style(prefs: Preferences) -> str | None:
+    """Infer communication style from conflict style when not explicitly set."""
+    if prefs.communication_style != "balanced":
+        return prefs.communication_style
+    if prefs.conflict_style:
+        return _CONFLICT_TO_COMM.get(prefs.conflict_style)
+    return None
+
+
 def _score_communication_style(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
-    a, b = prefs_a.communication_style, prefs_b.communication_style
-    # Both default = no signal
-    if a == "balanced" and b == "balanced":
+    a = _infer_communication_style(prefs_a)
+    b = _infer_communication_style(prefs_b)
+    if a is None or b is None:
         return None
     if a == b:
-        return 1.0
-    # One is default, other is set — no real comparison
-    if "balanced" in (a, b):
-        return None
-    return 0.0
+        return COMM_STYLE_MATRIX.get((a, b), 1.0)
+    pair = (a, b) if (a, b) in COMM_STYLE_MATRIX else (b, a)
+    return COMM_STYLE_MATRIX.get(pair, 0.0)
 
 
 def _score_lifestyle_signals(prefs_a: Preferences, prefs_b: Preferences) -> float | None:
