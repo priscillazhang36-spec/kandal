@@ -56,14 +56,25 @@ def rescue_stale_conversations() -> dict:
                 "narrative": narrative,
             }).eq("id", profile_id).execute()
 
-            client.table("preferences").upsert({
+            prefs_data = {
                 "profile_id": profile_id,
                 "attachment_style": traits.attachment_style,
                 "love_language_giving": traits.love_language_giving,
                 "love_language_receiving": traits.love_language_receiving,
                 "conflict_style": traits.conflict_style,
                 "relationship_history": traits.relationship_history,
-            }, on_conflict="profile_id").execute()
+            }
+            if traits.interests:
+                prefs_data["interests"] = traits.interests
+            if traits.personality:
+                prefs_data["personality"] = traits.personality
+            if traits.values:
+                prefs_data["values"] = traits.values
+            if traits.lifestyle:
+                prefs_data["lifestyle"] = traits.lifestyle
+            client.table("preferences").upsert(
+                prefs_data, on_conflict="profile_id"
+            ).execute()
 
             try:
                 embedding = embed_narrative(narrative)

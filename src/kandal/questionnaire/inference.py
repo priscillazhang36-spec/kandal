@@ -39,6 +39,11 @@ class InferredTraits(BaseModel):
     # Emotional dynamics — the core matching signal
     emotional_giving: str | None = None    # how this person makes partners feel
     emotional_needs: str | None = None     # what they need to feel from a partner
+    # Tier 1 tag lists — extracted from conversation
+    interests: list[str] | None = None
+    personality: list[str] | None = None
+    values: list[str] | None = None
+    lifestyle: list[str] | None = None
 
 
 def _argmax_with_priority(counts: dict[str, int], priority: list[str]) -> str:

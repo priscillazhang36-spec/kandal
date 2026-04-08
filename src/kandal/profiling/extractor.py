@@ -280,6 +280,35 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
     if not isinstance(emotional_needs, str) or len(emotional_needs.strip()) < 10:
         emotional_needs = None
 
+    # Tier 1 tag lists — validate as lists of strings
+    interests = data.get("interests")
+    if not isinstance(interests, list):
+        interests = None
+    else:
+        interests = [str(t).lower().strip() for t in interests if isinstance(t, str)]
+        interests = interests or None
+
+    personality = data.get("personality")
+    if not isinstance(personality, list):
+        personality = None
+    else:
+        personality = [str(t).lower().strip() for t in personality if isinstance(t, str)]
+        personality = personality or None
+
+    values = data.get("values")
+    if not isinstance(values, list):
+        values = None
+    else:
+        values = [str(t).lower().strip() for t in values if isinstance(t, str)]
+        values = values or None
+
+    lifestyle = data.get("lifestyle")
+    if not isinstance(lifestyle, list):
+        lifestyle = None
+    else:
+        lifestyle = [str(t).lower().strip() for t in lifestyle if isinstance(t, str)]
+        lifestyle = lifestyle or None
+
     traits = InferredTraits(
         attachment_style=attachment,
         love_language_giving=giving,
@@ -294,6 +323,10 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
         dimension_weights=dimension_weights,
         emotional_giving=emotional_giving,
         emotional_needs=emotional_needs,
+        interests=interests,
+        personality=personality,
+        values=values,
+        lifestyle=lifestyle,
     )
 
     return traits, narrative

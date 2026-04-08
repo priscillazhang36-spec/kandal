@@ -126,6 +126,14 @@ def _finalize(session: OnboardingSession) -> bool:
         prefs_data["cultural_preferences"] = traits.cultural_preferences
     if traits.dimension_weights:
         prefs_data["dimension_weights"] = traits.dimension_weights
+    if traits.interests:
+        prefs_data["interests"] = traits.interests
+    if traits.personality:
+        prefs_data["personality"] = traits.personality
+    if traits.values:
+        prefs_data["values"] = traits.values
+    if traits.lifestyle:
+        prefs_data["lifestyle"] = traits.lifestyle
 
     try:
         client.table("preferences").upsert(
