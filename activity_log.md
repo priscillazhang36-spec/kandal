@@ -89,6 +89,13 @@
 - **Cost optimization** — Switched `extract_traits` from Claude Sonnet to Haiku (~15x cost reduction)
 - **DB migration** — `00006_partner_preferences.sql`: partner_personality, partner_values columns on preferences
 
+## Phase 8: Conversation UX improvements (user feedback)
+**What:** Improved conversation experience based on test user feedback.
+
+- **Expectation setting** — Opening message now tells users: ~12-15 questions, 10-15 min, a sentence or two per answer is fine (`src/kandal/profiling/engine.py`)
+- **Softer follow-ups** — Reworked vague-answer handling: offer scenarios/this-or-that instead of calling out dodged questions; let go after one gentle reframe and circle back later from a different angle (`src/kandal/profiling/prompts.py`)
+- **Tone adjustment** — Replaced "cop-out answer" challenge style with gentler nudges; fold missed sub-questions into next turn naturally instead of "you never answered X"
+
 ## Current State
 
 | Component | Status |

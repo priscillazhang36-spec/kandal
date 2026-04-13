@@ -50,6 +50,19 @@ class InferredTraits(BaseModel):
     values: list[str] | None = None
     partner_values: list[str] | None = None
     lifestyle: list[str] | None = None
+    # Lifestyle basics — dealbreaker-grade filters
+    age_min: int | None = None
+    age_max: int | None = None
+    max_distance_km: int | None = None
+    relationship_intent: str | None = None        # casual / dating / serious / marriage_track
+    has_kids: str | None = None                   # yes / no
+    wants_kids: str | None = None                 # yes / no / maybe / open
+    relationship_structure: str | None = None     # monogamous / enm / poly / open
+    religion: str | None = None                   # free text
+    religion_importance: str | None = None        # not_important / somewhat / very
+    drinks: str | None = None                     # never / socially / regularly
+    smokes: str | None = None                     # never / socially / regularly
+    cannabis: str | None = None                   # never / socially / regularly
 
 
 def _argmax_with_priority(counts: dict[str, int], priority: list[str]) -> str:

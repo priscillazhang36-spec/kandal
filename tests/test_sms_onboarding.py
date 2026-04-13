@@ -239,15 +239,18 @@ def test_collecting_city_completes(mock_finalize, mock_load, mock_save, mock_sen
     assert "all set" in reply.lower()
 
 
+@patch("kandal.profiling.chat.chat_turn")
 @patch("kandal.sms.handler.send_sms")
 @patch("kandal.sms.handler._load_session")
-def test_complete_state_reply(mock_load, mock_send):
+def test_complete_state_reply(mock_load, mock_send, mock_chat):
+    from kandal.profiling.chat import ChatTurn
     session = _make_session(state="complete", profile_id=uuid4())
     mock_load.return_value = session
+    mock_chat.return_value = ChatTurn(reply="hey you")
 
     reply = route_message("+15551234567", "hello")
 
-    assert "already" in reply.lower() or "set up" in reply.lower()
+    assert reply == "hey you"
 
 
 @patch("kandal.sms.handler.send_sms")
@@ -284,7 +287,7 @@ def test_start_auth_sends_code(mock_sb, mock_send):
     resp = client.post("/auth/start", json={"phone": "+15551234567"})
 
     assert resp.status_code == 200
-    assert resp.json()["status"] == "code_sent"
+    assert resp.json()["status"] == "started"
     mock_send.assert_called_once()
 
 

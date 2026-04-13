@@ -138,6 +138,14 @@ def _finalize(session: OnboardingSession) -> bool:
         prefs_data["partner_values"] = traits.partner_values
     if traits.lifestyle:
         prefs_data["lifestyle"] = traits.lifestyle
+    for field in (
+        "age_min", "age_max", "max_distance_km", "relationship_intent",
+        "has_kids", "wants_kids", "relationship_structure",
+        "religion", "religion_importance", "drinks", "smokes", "cannabis",
+    ):
+        val = getattr(traits, field, None)
+        if val is not None:
+            prefs_data[field] = val
 
     try:
         client.table("preferences").upsert(
@@ -556,7 +564,21 @@ def route_message(phone: str, body: str) -> str:
         else:
             reply = messages.FINALIZE_FAILED
     elif state == "complete":
-        reply = messages.ALREADY_COMPLETE
+        # Onboarding done — route to ongoing Kandal chat ("1am text" loop).
+        from kandal.profiling.chat import ProfileMissingError, chat_turn
+        try:
+            reply = chat_turn(session.profile_id, body).reply
+        except ProfileMissingError:
+            # Profile got deleted out from under us — reset and ask user to restart.
+            logger.info("profile %s missing; resetting session %s", session.profile_id, phone)
+            session.state = "expired"
+            session.profile_id = None
+            _save_session(session)
+            reply = messages.SESSION_EXPIRED
+        except Exception as e:
+            logger.error("kandal chat_turn failed for %s: %s", phone, e)
+            critical_alert(f"Kandal chat failed for {phone}", e)
+            reply = messages.ALREADY_COMPLETE
     elif state == "expired":
         reply = messages.SESSION_EXPIRED
     else:

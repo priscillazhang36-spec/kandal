@@ -42,7 +42,7 @@ def rescue_stale_conversations() -> dict:
             continue
 
         try:
-            traits, narrative = extract_traits(messages)
+            traits, narrative, _ = extract_traits(messages)
 
             client.table("profiling_conversations").update({
                 "status": "rescued",
@@ -76,6 +76,14 @@ def rescue_stale_conversations() -> dict:
                 prefs_data["partner_values"] = traits.partner_values
             if traits.lifestyle:
                 prefs_data["lifestyle"] = traits.lifestyle
+            for field in (
+                "age_min", "age_max", "max_distance_km", "relationship_intent",
+                "has_kids", "wants_kids", "relationship_structure",
+                "religion", "religion_importance", "drinks", "smokes", "cannabis",
+            ):
+                val = getattr(traits, field, None)
+                if val is not None:
+                    prefs_data[field] = val
             client.table("preferences").upsert(
                 prefs_data, on_conflict="profile_id"
             ).execute()

@@ -179,6 +179,66 @@ def _format_conversation(messages: list[dict]) -> str:
     return "\n".join(lines)
 
 
+# Behavioral phrases that indicate *real* love-language evidence (user-side only).
+# If none appear in the user's messages, the LLM's LL inference is hallucination.
+_LL_BEHAVIOR_PHRASES = (
+    "words of affirmation", "quality time", "physical touch", "acts of service",
+    "gifts",
+    # Words-of-affirmation signals
+    "tell me", "say it", "hear it", "compliment", "affirm", "encourage",
+    # Quality-time signals
+    "spend time", "time together", "undivided attention", "be present", "just us",
+    # Physical-touch signals
+    "hold me", "hold hands", "cuddle", "hug", "touch", "affection", "physical",
+    # Acts-of-service signals
+    "do things for", "takes care of", "plan things", "plans things", "cooks",
+    "cleans", "helps me with", "takes something off my plate", "makes dinner",
+    # Gift signals
+    "gift", "bring me", "surprise me with", "thoughtful present",
+)
+
+
+_ATTACHMENT_PHRASES = (
+    "anxious", "clingy", "needy", "pull away", "pulled away", "distance myself",
+    "overthink", "avoidant", "avoid commitment", "secure", "insecure", "abandon",
+    "worry they", "worry he", "worry she", "push people away", "shut down emotionally",
+    "attachment",
+)
+
+_CONFLICT_PHRASES = (
+    "when we fight", "arguments", "argue", "disagreement", "shut down",
+    "need space", "cool off", "cool down", "talk it out", "avoid confrontation",
+    "avoid conflict", "stonewall", "silent treatment", "blow up", "yell",
+    "walk away", "address it immediately", "hash it out",
+)
+
+_HISTORY_PHRASES = (
+    "my ex", "past relationship", "last relationship", "long-term", "long term",
+    "serious relationship", "never really dated", "never dated",
+    "casual", "situationship", "just out of", "break up", "broke up",
+    "got out of", "single for", "haven't dated", "haven't been dating",
+    "dated someone", "years with", "years together",
+)
+
+
+def _user_text(messages: list[dict]) -> str:
+    return " ".join(
+        m["content"].lower()
+        for m in messages
+        if m.get("role") == "user" and isinstance(m.get("content"), str)
+    )
+
+
+def _user_mentioned_love_behaviors(messages: list[dict]) -> bool:
+    text = _user_text(messages)
+    return any(p in text for p in _LL_BEHAVIOR_PHRASES)
+
+
+def _has_phrase(messages: list[dict], phrases: tuple[str, ...]) -> bool:
+    text = _user_text(messages)
+    return any(p in text for p in phrases)
+
+
 def _parse_json_response(raw: str) -> dict:
     """Extract JSON from a response that may contain markdown code blocks."""
     if "```" in raw:
@@ -186,10 +246,13 @@ def _parse_json_response(raw: str) -> dict:
     return json.loads(raw.strip())
 
 
-def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
+def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]:
     """Extract InferredTraits + narrative from a completed conversation.
 
-    Returns (traits, narrative).
+    Returns (traits, narrative, low_confidence_fields). The third element names
+    fields that were defaulted because the conversation provided no real signal.
+    Callers (e.g. the summary step) should skip these to avoid stating fallbacks
+    as facts.
     """
     client = _get_client()
     conversation_text = _format_conversation(messages)
@@ -204,31 +267,62 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
     )
 
     data = _parse_json_response(response.content[0].text)
+    low_conf: set[str] = set()
 
-    # Validate core traits
-    attachment = data.get("attachment_style", "secure")
-    if attachment not in VALID_ATTACHMENT_STYLES:
+    # Defensive check: if user never used love-behavior language, force LL to low_conf
+    # regardless of what the extractor LLM returned. Haiku sometimes infers LL from
+    # personality MCQs despite the prompt forbidding it — this is the safety net.
+    ll_behaviors_present = _user_mentioned_love_behaviors(messages)
+
+    # Validate core traits — track which were defaulted vs signaled
+    raw_attachment = data.get("attachment_style")
+    if raw_attachment in VALID_ATTACHMENT_STYLES and _has_phrase(messages, _ATTACHMENT_PHRASES):
+        attachment = raw_attachment
+    else:
         attachment = "secure"
+        low_conf.add("attachment_style")
 
-    conflict = data.get("conflict_style", "collaborative")
-    if conflict not in VALID_CONFLICT_STYLES:
+    raw_conflict = data.get("conflict_style")
+    if raw_conflict in VALID_CONFLICT_STYLES and _has_phrase(messages, _CONFLICT_PHRASES):
+        conflict = raw_conflict
+    else:
         conflict = "collaborative"
+        low_conf.add("conflict_style")
 
-    history = data.get("relationship_history", "limited_experience")
-    if history not in VALID_RELATIONSHIP_HISTORIES:
+    raw_history = data.get("relationship_history")
+    if raw_history in VALID_RELATIONSHIP_HISTORIES and _has_phrase(messages, _HISTORY_PHRASES):
+        history = raw_history
+    else:
         history = "limited_experience"
+        low_conf.add("relationship_history")
 
-    giving = data.get("love_language_giving", VALID_LOVE_LANGUAGES[:])
-    giving = [l for l in giving if l in VALID_LOVE_LANGUAGES]
-    for lang in VALID_LOVE_LANGUAGES:
-        if lang not in giving:
-            giving.append(lang)
+    raw_giving = data.get("love_language_giving")
+    if (
+        ll_behaviors_present
+        and isinstance(raw_giving, list)
+        and any(l in VALID_LOVE_LANGUAGES for l in raw_giving)
+    ):
+        giving = [l for l in raw_giving if l in VALID_LOVE_LANGUAGES]
+        for lang in VALID_LOVE_LANGUAGES:
+            if lang not in giving:
+                giving.append(lang)
+    else:
+        giving = VALID_LOVE_LANGUAGES[:]
+        low_conf.add("love_language_giving")
 
-    receiving = data.get("love_language_receiving", VALID_LOVE_LANGUAGES[:])
-    receiving = [l for l in receiving if l in VALID_LOVE_LANGUAGES]
-    for lang in VALID_LOVE_LANGUAGES:
-        if lang not in receiving:
-            receiving.append(lang)
+    raw_receiving = data.get("love_language_receiving")
+    if (
+        ll_behaviors_present
+        and isinstance(raw_receiving, list)
+        and any(l in VALID_LOVE_LANGUAGES for l in raw_receiving)
+    ):
+        receiving = [l for l in raw_receiving if l in VALID_LOVE_LANGUAGES]
+        for lang in VALID_LOVE_LANGUAGES:
+            if lang not in receiving:
+                receiving.append(lang)
+    else:
+        receiving = VALID_LOVE_LANGUAGES[:]
+        low_conf.add("love_language_receiving")
 
     narrative = data.get("narrative", "")
 
@@ -248,9 +342,12 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
     # Validate new fields
     gender_pref = data.get("gender_preference")
     if gender_pref is not None:
-        gender_pref = [g for g in gender_pref if g in VALID_GENDERS]
-        if not gender_pref:
+        if not isinstance(gender_pref, list):
             gender_pref = None
+        else:
+            gender_pref = [g for g in gender_pref if g in VALID_GENDERS]
+            if not gender_pref:
+                gender_pref = None
 
     cultural_prefs = data.get("cultural_preferences")
     if not isinstance(cultural_prefs, list):
@@ -335,6 +432,30 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
         lifestyle = [str(t).lower().strip() for t in lifestyle if isinstance(t, str)]
         lifestyle = lifestyle or None
 
+    def _enum(key: str, allowed: set[str]) -> str | None:
+        v = data.get(key)
+        return v if isinstance(v, str) and v in allowed else None
+
+    def _int(key: str) -> int | None:
+        v = data.get(key)
+        try:
+            return int(v) if v is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    age_min = _int("age_min")
+    age_max = _int("age_max")
+    max_distance_km = _int("max_distance_km")
+    relationship_intent = _enum("relationship_intent", {"casual", "dating", "serious", "marriage_track"})
+    has_kids = _enum("has_kids", {"yes", "no"})
+    wants_kids = _enum("wants_kids", {"yes", "no", "maybe", "open"})
+    relationship_structure = _enum("relationship_structure", {"monogamous", "enm", "poly", "open"})
+    religion = data.get("religion") if isinstance(data.get("religion"), str) and data.get("religion").strip() else None
+    religion_importance = _enum("religion_importance", {"not_important", "somewhat", "very"})
+    drinks = _enum("drinks", {"never", "socially", "regularly"})
+    smokes = _enum("smokes", {"never", "socially", "regularly"})
+    cannabis = _enum("cannabis", {"never", "socially", "regularly"})
+
     traits = InferredTraits(
         attachment_style=attachment,
         love_language_giving=giving,
@@ -358,9 +479,21 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str]:
         values=values,
         partner_values=partner_values,
         lifestyle=lifestyle,
+        age_min=age_min,
+        age_max=age_max,
+        max_distance_km=max_distance_km,
+        relationship_intent=relationship_intent,
+        has_kids=has_kids,
+        wants_kids=wants_kids,
+        relationship_structure=relationship_structure,
+        religion=religion,
+        religion_importance=religion_importance,
+        drinks=drinks,
+        smokes=smokes,
+        cannabis=cannabis,
     )
 
-    return traits, narrative
+    return traits, narrative, low_conf
 
 
 def assess_coverage(messages: list[dict]) -> dict[str, float]:
