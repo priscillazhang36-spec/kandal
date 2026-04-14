@@ -187,6 +187,17 @@ def _bump_salience(memory_id: str, bump: float = 0.05) -> None:
         logger.debug("bump salience failed: %s", e)
 
 
+def _profile_exists(profile_id: UUID) -> bool:
+    try:
+        resp = (
+            get_supabase().table("profiles")
+            .select("id").eq("id", str(profile_id)).limit(1).execute()
+        )
+        return bool(resp.data)
+    except Exception:
+        return False
+
+
 def write_memory(
     profile_id: UUID,
     kind: str,
@@ -198,6 +209,9 @@ def write_memory(
         raise ValueError(f"invalid memory kind: {kind}")
     content = content.strip()
     if not content:
+        return
+    if not _profile_exists(profile_id):
+        logger.debug("skipping memory write — profile %s missing", profile_id)
         return
     embedding = _embed(content)
     is_dup, existing = _is_duplicate(profile_id, kind, embedding)
@@ -216,6 +230,9 @@ def write_memory(
 
 def write_memories(profile_id: UUID, memories: list[dict], source: str | None = None) -> int:
     """Bulk insert with embeddings + dedup. Returns count of new rows written."""
+    if not _profile_exists(profile_id):
+        logger.debug("skipping bulk memory writes — profile %s missing", profile_id)
+        return 0
     written = 0
     for m in memories:
         kind = m.get("kind")

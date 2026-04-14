@@ -183,18 +183,23 @@ def _format_conversation(messages: list[dict]) -> str:
 # If none appear in the user's messages, the LLM's LL inference is hallucination.
 _LL_BEHAVIOR_PHRASES = (
     "words of affirmation", "quality time", "physical touch", "acts of service",
-    "gifts",
-    # Words-of-affirmation signals
-    "tell me", "say it", "hear it", "compliment", "affirm", "encourage",
-    # Quality-time signals
-    "spend time", "time together", "undivided attention", "be present", "just us",
-    # Physical-touch signals
-    "hold me", "hold hands", "cuddle", "hug", "touch", "affection", "physical",
-    # Acts-of-service signals
-    "do things for", "takes care of", "plan things", "plans things", "cooks",
-    "cleans", "helps me with", "takes something off my plate", "makes dinner",
-    # Gift signals
-    "gift", "bring me", "surprise me with", "thoughtful present",
+    # Words-of-affirmation signals — concrete phrases only
+    "compliment", "tell me he loves", "tell me she loves", "tell me they love",
+    "hear him say", "hear her say", "hear them say", "verbal affirmation",
+    "encouraging words", "kind words",
+    # Quality-time signals — concrete phrases only
+    "spend time together", "undivided attention", "phone away", "one-on-one time",
+    "date night",
+    # Physical-touch signals — concrete phrases only
+    "hold hands", "cuddle", "hug me", "hugs", "kissing", "physical affection",
+    "sit close", "back rub",
+    # Acts-of-service signals — concrete phrases only
+    "do things for me", "takes care of", "plan things for me", "plans things for me",
+    "cooks for me", "helps me with chores", "takes something off my plate",
+    "makes me dinner", "brings me coffee", "runs errands",
+    # Gift signals — concrete phrases only
+    "brings me flowers", "surprise me with", "thoughtful gift", "thoughtful present",
+    "thoughtful gifts",
 )
 
 

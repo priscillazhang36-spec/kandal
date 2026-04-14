@@ -54,24 +54,42 @@ def _finalize(session: OnboardingSession) -> bool:
     """
     client = get_supabase()
 
-    # Check if we have adaptive profiling results
+    # Check if we have adaptive profiling results. Order of preference:
+    #   1. extracted_traits already stored (normal finish)
+    #   2. salvage: run extract_traits on whatever messages exist
+    #   3. fixed-questionnaire inference from session.answers
+    # Never let a real adaptive conversation die as default-shaped junk.
     narrative = None
+    traits = None
     if session.conversation_id:
         conv_resp = (
             client.table("profiling_conversations")
-            .select("extracted_traits, narrative")
+            .select("extracted_traits, narrative, messages, status")
             .eq("id", str(session.conversation_id))
             .execute()
         )
-        if conv_resp.data and conv_resp.data[0].get("extracted_traits"):
+        row = conv_resp.data[0] if conv_resp.data else {}
+        if row.get("extracted_traits"):
             from kandal.questionnaire.inference import InferredTraits
-
-            traits = InferredTraits(**conv_resp.data[0]["extracted_traits"])
-            narrative = conv_resp.data[0].get("narrative")
+            traits = InferredTraits(**row["extracted_traits"])
+            narrative = row.get("narrative")
         else:
-            # Fallback to fixed questionnaire inference
-            traits = infer_traits(session.answers)
-    else:
+            msgs = row.get("messages") or []
+            user_turns = sum(1 for m in msgs if m.get("role") == "user")
+            if user_turns >= 2:
+                try:
+                    from kandal.profiling.extractor import extract_traits
+                    traits, narrative, _ = extract_traits(msgs)
+                    client.table("profiling_conversations").update({
+                        "extracted_traits": traits.model_dump(),
+                        "narrative": narrative,
+                        "status": "partial",
+                    }).eq("id", str(session.conversation_id)).execute()
+                    logger.info("Salvaged partial traits for %s (%d user turns)", session.phone, user_turns)
+                except Exception as e:
+                    logger.warning("Partial-trait salvage failed for %s: %s", session.phone, e)
+
+    if traits is None:
         traits = infer_traits(session.answers)
 
     profile_update = {
@@ -339,9 +357,11 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
             coverage=conv.get("coverage", {}),
             questions_asked=len([m for m in conv["messages"] if m["role"] == "assistant"]),
             awaiting_confirmation=(conv_status == "awaiting_confirmation"),
+            awaiting_basics=(conv_status == "awaiting_basics"),
             awaiting_ranking=(conv_status == "awaiting_ranking"),
             pending_traits=conv.get("extracted_traits"),
             pending_narrative=conv.get("narrative"),
+            basics_index=conv.get("basics_index", 0),
         )
 
         engine = ProfilingEngine()
@@ -355,8 +375,15 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
         }
         if turn.awaiting_ranking:
             update_data["status"] = "awaiting_ranking"
-            if turn.traits:
-                update_data["extracted_traits"] = turn.traits.model_dump()
+            if state.pending_traits:
+                update_data["extracted_traits"] = state.pending_traits
+            if turn.narrative:
+                update_data["narrative"] = turn.narrative
+        elif turn.awaiting_basics:
+            update_data["status"] = "awaiting_basics"
+            update_data["basics_index"] = state.basics_index
+            if state.pending_traits:
+                update_data["extracted_traits"] = state.pending_traits
             if turn.narrative:
                 update_data["narrative"] = turn.narrative
         elif turn.awaiting_confirmation:
@@ -395,9 +422,31 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
 
     except Exception as e:
         logger.error("Adaptive profiling failed mid-conversation: %s", e)
-        # Fall back to fixed questions from the beginning
+        critical_alert(f"Adaptive profiling failed for {session.phone}: {e}", e)
+
+        # Before falling back, salvage whatever adaptive signal we have so
+        # _finalize can use it instead of defaulting to fixed-Q inference.
+        if session.conversation_id:
+            try:
+                client = get_supabase()
+                conv = client.table("profiling_conversations").select("messages").eq(
+                    "id", str(session.conversation_id)
+                ).execute()
+                msgs = (conv.data[0].get("messages") if conv.data else None) or []
+                if sum(1 for m in msgs if m.get("role") == "user") >= 2:
+                    from kandal.profiling.extractor import extract_traits
+                    traits, narrative, _ = extract_traits(msgs)
+                    client.table("profiling_conversations").update({
+                        "extracted_traits": traits.model_dump(),
+                        "narrative": narrative,
+                        "status": "partial",
+                    }).eq("id", str(session.conversation_id)).execute()
+                    logger.info("Salvaged adaptive traits on error for %s", session.phone)
+            except Exception as salvage_err:
+                logger.warning("Could not salvage adaptive traits: %s", salvage_err)
+
+        # Fall back to fixed questions (conversation_id retained so _finalize can read salvaged traits)
         session.state = "onboarding_q1"
-        session.conversation_id = None
         _save_session(session)
         q_text = messages.format_question(QUESTIONS[0])
         return f"{messages.QUESTION_INTRO}\n\n{q_text}"

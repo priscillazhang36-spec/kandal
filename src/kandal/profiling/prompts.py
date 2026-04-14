@@ -225,6 +225,10 @@ words that justify it, OMIT that section. Better silent than wrong. Describe wha
 they actually said in their own terms when possible.
 - If you find yourself writing a number, check it came from the traits. If it \
 didn't, delete it.
+- NEVER state dimension weights, priority percentages, or a ranked list of what \
+matters most (e.g. "emotional fit is #1 priority (25%)"). Those are decided AFTER \
+this summary via a ranking question — you don't know them yet. Describe what \
+someone is looking for in plain language instead, without numbers or rank order.
 - Better to omit a section than to invent content for it.
 
 Include (only if present in the extracted traits):
@@ -305,46 +309,14 @@ def build_conversation_prompt(
         phase_hint = "You are in PHASE 2 (relationships + emotions). Go deeper into how they are in relationships — emotional dynamics, love languages, conflict style, attachment patterns, relationship history. Use what they already told you as bridges."
     else:
         phase_hint = (
-            "You are in PHASE 3 (basics + priorities). Collect any remaining basics, "
-            "but **ask the discrete-choice ones as multiple choice, ONE AT A TIME** — "
-            "never bundle two basics into the same message. Skip anything already covered.\n\n"
-            "**Multiple-choice basics** (one per message, A/B/C/... format, always include "
-            "an 'or tell me' open option):\n"
-            "  - Their own gender — A) Male  B) Female  C) Non-binary  D) Prefer to self-describe\n"
-            "  - Who they're attracted to — A) Men  B) Women  C) Non-binary folks  "
-            "D) Open to all  E) Tell me in your own words\n"
-            "  - Cultural/background preference — A) No preference  B) Yes, I have a preference (tell me)  "
-            "(only ask once; if 'no preference,' move on)\n"
-            "  - Age range for a partner — give 3-4 reasonable bands relative to their own age "
-            "(e.g. for a 30yo: A) 25-32  B) 28-38  C) 30-45  D) Open / no preference)\n"
-            "  - Distance — A) Same city only  B) Within ~50km  C) Same region/state  "
-            "D) Open to long distance\n"
-            "  - What they're looking for — A) Casual / seeing what's out there  "
-            "B) Dating, no rush  C) Something serious  D) Marriage-track\n"
-            "  - Kids — two questions, ask separately: "
-            "(1) Do you have kids? A) Yes  B) No  "
-            "(2) Want kids someday? A) Yes  B) No  C) Maybe  D) Open either way\n"
-            "  - Relationship structure — A) Monogamous  B) Ethically non-monogamous  "
-            "C) Polyamorous  D) Open / figuring it out  (skip if obviously monogamous from context)\n"
-            "  - Religion/spirituality — two parts, ask together only if it comes up naturally, "
-            "otherwise one MCQ: 'How important is religion or spirituality in a partner?' "
-            "A) Not important  B) Somewhat  C) Very important  (if B/C, follow up: which tradition?)\n"
-            "  - Substances — one combined casual ask is fine: 'quick lifestyle check — drinking, "
-            "smoking, weed: never / socially / regularly for each?' Let them answer free-form.\n"
-            "Frame casually — 'quick one:' or 'okay, last few logistics —' — not like a form.\n\n"
-            "**Free-text basics** (ask separately, no MCQ): birthday, birth time, birthplace, "
-            "current city. These are open questions. Weave them in casually, one at a time.\n\n"
-            "**Matching priorities** is its own thing — that's the personality/values question, "
-            "not a basic. Handle it conversationally per its pillar guidance.\n\n"
-            "**Partial birthday handling**: a full birthday is YEAR + MONTH + DAY. If "
-            "they give you only some pieces, follow up casually for the missing piece "
-            "before moving on. Examples:\n"
-            "  - They say '11/28' → 'oh nice — what year?'\n"
-            "  - They say 'November 1996' → 'and the day?'\n"
-            "  - They say '1996' → 'cool — what's the month and day?'\n"
-            "Don't make a big deal of it, just one short follow-up. If they don't know "
-            "or don't want to share the year, accept it and move on — month/day alone "
-            "is fine, we just won't store a birthday."
+            "You are in PHASE 3 (closing out the qualitative conversation). Focus on "
+            "anything still missing about how they LOVE, how they FIGHT, and WHAT KIND "
+            "OF PERSON they're looking for (personality/values/vibe). "
+            "**Do NOT ask about birthday, location, age range, distance, kids, "
+            "relationship structure, religion, or substances** — those are collected "
+            "separately after the summary. "
+            "If you genuinely have everything qualitative, just ask one last natural "
+            "follow-up or two. The system will take over from there."
         )
 
     # Pacing label — coverage-driven, what you'd tell the user if they asked.

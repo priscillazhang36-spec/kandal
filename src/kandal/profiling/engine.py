@@ -45,11 +45,11 @@ COVERAGE_CHECK_INTERVAL = 2
 ESSENTIAL_DIMENSIONS = [
     "emotional_dynamics",      # giving + needs — the qualitative core
     "relationship_history",    # huge context for any read
-    "partner_preferences",     # dealbreaker filter can't run without this
     "matching_priorities",     # LLM judge needs "what they're looking for"
-    "birth_info",              # birthday + current city — basic logistics
-    "lifestyle_basics",        # intent, kids, age range, distance (MCQ set)
 ]
+# partner_preferences, birth_info, lifestyle_basics are NOT gated in conversation
+# — they're collected deterministically via the post-summary basics MCQ loop
+# (see basics.py). This guarantees consistency and zero hallucination.
 ESSENTIAL_THRESHOLD = 0.6
 
 OPENING_MESSAGE = (
@@ -153,9 +153,11 @@ class ProfilingState:
     questions_asked: int = 0
     max_questions: int = TARGET_QUESTION_COUNT  # soft target, not a hard cap
     awaiting_confirmation: bool = False
+    awaiting_basics: bool = False
     awaiting_ranking: bool = False
     pending_traits: dict | None = None
     pending_narrative: str | None = None
+    basics_index: int = 0
 
 
 @dataclass
@@ -163,6 +165,7 @@ class ProfilingTurn:
     reply: str
     is_complete: bool
     awaiting_confirmation: bool = False
+    awaiting_basics: bool = False
     awaiting_ranking: bool = False
     traits: InferredTraits | None = None
     narrative: str | None = None
@@ -207,6 +210,10 @@ class ProfilingEngine:
         if state.awaiting_ranking:
             return self._handle_ranking(state, user_reply)
 
+        # Handle deterministic basics MCQ loop
+        if state.awaiting_basics:
+            return self._handle_basics(state, user_reply)
+
         # Handle confirmation response
         if state.awaiting_confirmation:
             return self._handle_confirmation(state, user_reply)
@@ -218,8 +225,11 @@ class ProfilingEngine:
         # Finalize only when essentials are covered (or hard safety cap hit).
         # The target question count is a soft signal for pacing — not a stop.
         missing = _missing_essentials(state.coverage)
+        # Hard rule: essentials MUST be covered. No path to summary while any
+        # essential is below threshold, except the safety cap.
+        essentials_ok = not missing
         should_finalize = (
-            (_all_covered(state.coverage) and state.questions_asked >= 5)
+            (essentials_ok and _all_covered(state.coverage) and state.questions_asked >= 5)
             or state.questions_asked >= HARD_QUESTION_CAP
         )
 
@@ -284,10 +294,8 @@ class ProfilingEngine:
         """Handle user's response to the profile summary."""
         if user_reply.strip().lower() in _CONFIRM_YES:
             state.awaiting_confirmation = False
-            traits = InferredTraits(**state.pending_traits)
-
-            # Always ask ranking so the user explicitly controls their priorities
-            return self._ask_ranking(state)
+            # Transition to deterministic basics collection (MCQ loop).
+            return self._start_basics(state)
 
         # User wants corrections — re-extract with correction context
         traits, narrative, low_conf = extract_traits(state.messages)
@@ -303,6 +311,64 @@ class ProfilingEngine:
             awaiting_confirmation=True,
             traits=traits,
             narrative=narrative,
+            coverage={dim: 1.0 for dim in TRAIT_DIMENSIONS},
+        )
+
+    def _start_basics(self, state: ProfilingState) -> ProfilingTurn:
+        """Kick off the post-summary basics MCQ loop."""
+        from kandal.profiling.basics import next_question
+        state.basics_index = 0
+        nq = next_question(state.pending_traits or {}, state.basics_index)
+        if nq is None:
+            # Nothing to collect — go straight to ranking.
+            return self._ask_ranking(state)
+        question, idx = nq
+        state.awaiting_basics = True
+        state.basics_index = idx
+        intro = (
+            "Perfect. Alright, just a few quick logistics and we're done.\n\n"
+            + question.prompt
+        )
+        state.messages.append({"role": "assistant", "content": intro})
+        return ProfilingTurn(
+            reply=intro,
+            is_complete=False,
+            awaiting_basics=True,
+            coverage={dim: 1.0 for dim in TRAIT_DIMENSIONS},
+        )
+
+    def _handle_basics(self, state: ProfilingState, user_reply: str) -> ProfilingTurn:
+        """Parse the user's MCQ answer and advance to the next question (or ranking)."""
+        from kandal.profiling.basics import QUESTIONS, apply_answer, next_question
+
+        question = QUESTIONS[state.basics_index]
+        parsed = question.parse(user_reply)
+        if parsed is None:
+            # Couldn't parse — re-ask with a nudge.
+            retry = f"Didn't quite catch that. Pick a letter, or tell me in your own words.\n\n{question.prompt}"
+            state.messages.append({"role": "assistant", "content": retry})
+            return ProfilingTurn(
+                reply=retry,
+                is_complete=False,
+                awaiting_basics=True,
+                coverage={dim: 1.0 for dim in TRAIT_DIMENSIONS},
+            )
+
+        apply_answer(state.pending_traits, question, parsed)
+
+        # Advance
+        nq = next_question(state.pending_traits, state.basics_index + 1)
+        if nq is None:
+            state.awaiting_basics = False
+            return self._ask_ranking(state)
+
+        next_q, next_idx = nq
+        state.basics_index = next_idx
+        state.messages.append({"role": "assistant", "content": next_q.prompt})
+        return ProfilingTurn(
+            reply=next_q.prompt,
+            is_complete=False,
+            awaiting_basics=True,
             coverage={dim: 1.0 for dim in TRAIT_DIMENSIONS},
         )
 

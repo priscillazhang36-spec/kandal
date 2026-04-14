@@ -15,6 +15,19 @@ def main():
     engine = ProfilingEngine()
     state, opening = engine.start(profile_id)
 
+    # Insert a stub profile row up front so memory writes during the conversation
+    # (seed_from_onboarding on finalize) don't hit FK violations.
+    try:
+        get_supabase().table("profiles").insert({
+            "id": str(profile_id),
+            "name": "Test User",
+            "age": 25,
+            "gender": "female",
+            "is_active": False,
+        }).execute()
+    except Exception as e:
+        print(f"(stub profile insert failed, continuing: {e})")
+
     print(f"\nKandal: {opening}\n")
 
     while True:
@@ -52,7 +65,8 @@ def main():
         if turn.traits and turn.traits.emotional_needs:
             profile_data["emotional_needs"] = turn.traits.emotional_needs
 
-        client.table("profiles").insert(profile_data).execute()
+        profile_data["is_active"] = True
+        client.table("profiles").update(profile_data).eq("id", str(profile_id)).execute()
         print("  profiles ✓")
 
         prefs_data = {
@@ -75,29 +89,35 @@ def main():
 
         # Generate and store embeddings
         if turn.narrative:
-            from kandal.profiling.embeddings import embed_narrative
-            embedding = embed_narrative(turn.narrative)
-            client.table("profiles").update({
-                "narrative_embedding": embedding,
-                "embedding_version": 1,
-            }).eq("id", str(profile_id)).execute()
-            print(f"  narrative_embedding ✓ ({len(embedding)} dims)")
+            try:
+                from kandal.profiling.embeddings import embed_narrative
+                embedding = embed_narrative(turn.narrative)
+                client.table("profiles").update({
+                    "narrative_embedding": embedding,
+                    "embedding_version": 1,
+                }).eq("id", str(profile_id)).execute()
+                print(f"  narrative_embedding ✓ ({len(embedding)} dims)")
+            except Exception as e:
+                print(f"  narrative_embedding skipped: {e}")
 
         if turn.traits and (turn.traits.emotional_giving or turn.traits.emotional_needs):
-            from kandal.profiling.embeddings import embed_emotional_dynamics
-            giving_emb, needs_emb = embed_emotional_dynamics(
-                turn.traits.emotional_giving, turn.traits.emotional_needs
-            )
-            emb_update = {}
-            if giving_emb:
-                emb_update["emotional_giving_embedding"] = giving_emb
-            if needs_emb:
-                emb_update["emotional_needs_embedding"] = needs_emb
-            if emb_update:
-                client.table("profiles").update(emb_update).eq(
-                    "id", str(profile_id)
-                ).execute()
-                print(f"  emotional_embeddings ✓")
+            try:
+                from kandal.profiling.embeddings import embed_emotional_dynamics
+                giving_emb, needs_emb = embed_emotional_dynamics(
+                    turn.traits.emotional_giving, turn.traits.emotional_needs
+                )
+                emb_update = {}
+                if giving_emb:
+                    emb_update["emotional_giving_embedding"] = giving_emb
+                if needs_emb:
+                    emb_update["emotional_needs_embedding"] = needs_emb
+                if emb_update:
+                    client.table("profiles").update(emb_update).eq(
+                        "id", str(profile_id)
+                    ).execute()
+                    print(f"  emotional_embeddings ✓")
+            except Exception as e:
+                print(f"  emotional_embeddings skipped: {e}")
 
         client.table("profiling_conversations").insert({
             "profile_id": str(profile_id),
