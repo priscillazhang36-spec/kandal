@@ -117,6 +117,14 @@ def _finalize(session: OnboardingSession) -> bool:
         profile_update["emotional_giving"] = traits.emotional_giving
     if traits.emotional_needs:
         profile_update["emotional_needs"] = traits.emotional_needs
+    # Spark signals — freeform text + structured places
+    for field in (
+        "taste_fingerprint", "current_obsession", "two_hour_topic",
+        "contradiction_hook", "past_attraction", "favorite_places",
+    ):
+        val = getattr(traits, field, None)
+        if val:
+            profile_update[field] = val
 
     try:
         client.table("profiles").update(profile_update).eq(
@@ -160,6 +168,8 @@ def _finalize(session: OnboardingSession) -> bool:
         "age_min", "age_max", "max_distance_km", "relationship_intent",
         "has_kids", "wants_kids", "relationship_structure",
         "religion", "religion_importance", "drinks", "smokes", "cannabis",
+        # Spark MCQ categoricals
+        "humor_style", "conversational_texture", "energy_pace", "ambition_shape",
     ):
         val = getattr(traits, field, None)
         if val is not None:
@@ -357,10 +367,14 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
             coverage=conv.get("coverage", {}),
             questions_asked=len([m for m in conv["messages"] if m["role"] == "assistant"]),
             awaiting_confirmation=(conv_status == "awaiting_confirmation"),
+            awaiting_spark=(conv_status == "awaiting_spark"),
+            awaiting_longterm=(conv_status == "awaiting_longterm"),
             awaiting_basics=(conv_status == "awaiting_basics"),
-            awaiting_ranking=(conv_status == "awaiting_ranking"),
             pending_traits=conv.get("extracted_traits"),
             pending_narrative=conv.get("narrative"),
+            spark_index=conv.get("spark_index", 0),
+            longterm_answers=conv.get("longterm_answers") or [],
+            longterm_index=conv.get("longterm_index", 0),
             basics_index=conv.get("basics_index", 0),
         )
 
@@ -373,8 +387,17 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
             "coverage": turn.coverage,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-        if turn.awaiting_ranking:
-            update_data["status"] = "awaiting_ranking"
+        if turn.awaiting_spark:
+            update_data["status"] = "awaiting_spark"
+            update_data["spark_index"] = state.spark_index
+            if state.pending_traits:
+                update_data["extracted_traits"] = state.pending_traits
+            if turn.narrative:
+                update_data["narrative"] = turn.narrative
+        elif turn.awaiting_longterm:
+            update_data["status"] = "awaiting_longterm"
+            update_data["longterm_index"] = state.longterm_index
+            update_data["longterm_answers"] = state.longterm_answers
             if state.pending_traits:
                 update_data["extracted_traits"] = state.pending_traits
             if turn.narrative:
@@ -396,8 +419,12 @@ def _handle_adaptive_profiling(session: OnboardingSession, body: str) -> str:
             update_data["status"] = "complete"
             if turn.traits:
                 update_data["extracted_traits"] = turn.traits.model_dump()
+            elif state.pending_traits:
+                update_data["extracted_traits"] = state.pending_traits
             if turn.narrative:
                 update_data["narrative"] = turn.narrative
+            elif state.pending_narrative:
+                update_data["narrative"] = state.pending_narrative
 
         client.table("profiling_conversations").update(update_data).eq(
             "id", str(session.conversation_id)
@@ -459,7 +486,7 @@ def _handle_question(session: OnboardingSession, body: str, q_index: int) -> str
 
     session.answers.append(answer)
 
-    if q_index < 9:
+    if q_index < len(QUESTIONS) - 1:
         # Next question
         session.state = f"onboarding_q{q_index + 2}"
         _save_session(session)
