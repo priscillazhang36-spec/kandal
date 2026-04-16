@@ -96,6 +96,22 @@
 - **Softer follow-ups** — Reworked vague-answer handling: offer scenarios/this-or-that instead of calling out dodged questions; let go after one gentle reframe and circle back later from a different angle (`src/kandal/profiling/prompts.py`)
 - **Tone adjustment** — Replaced "cop-out answer" challenge style with gentler nudges; fold missed sub-questions into next turn naturally instead of "you never answered X"
 
+## Phase 9: Spark-first Onboarding
+**What:** Reframed onboarding around first-date "spark" signals (taste, humor, aliveness, conversational texture) instead of interrogating long-term compatibility in freeform. Long-term traits now come from a tight MCQ loop; freeform captures the texture a human actually flirts with.
+
+- **Spark signal schema** — New columns on profiles + preferences: `taste_fingerprint`, `current_obsession`, `two_hour_topic`, `contradiction_hook`, `past_attraction`, `favorite_places` (JSONB list) (`supabase/migrations/00013_spark_signals.sql`)
+- **Trait dimensions rewritten** — Freeform agent now pursues 5 spark-leaning dimensions: `spark_aliveness`, `spark_taste`, `spark_attraction`, `emotional_dynamics`, `partner_vibe` (`src/kandal/profiling/prompts.py`)
+- **Soul file refocused** — `soul.md` recentered on first-date predictors (taste, humor, aliveness) vs long-term stickiness; explicit persona + hallucination guards retained
+- **Stop milking small talk** — Phase-1 `phase_hint` now has an explicit "don't milk small talk" rule with the cat-ladder failure mode called out verbatim (one clarifying beat per topic, then pivot)
+- **Opener rewritten** — `OPENING_MESSAGE` pulls for current_obsession on turn 1 instead of generic "what made you smile this week"
+- **Spark scenario MCQs** — 4 new MCQs capturing humor_style, conversational_texture, energy_pace, ambition_shape (`src/kandal/profiling/spark_mcqs.py`)
+- **Long-term MCQs trimmed** — Cut from 10 to 4 focused scenario questions for attachment, love language, conflict, relationship_history (`src/kandal/questionnaire/questions.py`)
+- **Conversation flow chain** — Deterministic loop: freeform → summary confirm → spark MCQs (4) → long-term MCQs (4) → basics MCQs → finalize (`src/kandal/profiling/engine.py`)
+- **Resumable state** — Added `spark_index`, `longterm_index`, `longterm_answers` JSONB columns so SMS conversations survive gaps (`supabase/migrations/00014_spark_longterm_indices.sql`, `src/kandal/sms/handler.py`)
+- **Extractor split** — Freeform no longer infers attachment/LL/conflict/history (those now come from MCQs, marked `low_conf` until overwritten). Spark fields extracted as validated text + favorite_places as list of dicts (`src/kandal/profiling/extractor.py`)
+- **Ranking removed** — Dimension-weight ranking question gone; Stage B LLM judge will read raw signals directly. `dimension_weights` retained nullable on models for backcompat
+- **Tests** — 74 passing; questionnaire tests updated for the 4-question set
+
 ## Current State
 
 | Component | Status |
@@ -104,7 +120,7 @@
 | Profile + trait creation | Working end-to-end |
 | Scoring engine (11 dimensions) | Complete — semantic similarity, cross-comparison, Bazi |
 | Bazi (Four Pillars) matching | Complete — pure function, graceful degradation |
-| Profiling conversation | Overhauled — alter ego positioning, summary confirmation |
+| Profiling conversation | Spark-first — freeform → summary → spark MCQs → long-term MCQs → basics |
 | Batch matching | Runs daily + on-demand via API |
 | Vercel deployment | Live with auto-deploy |
 | Landing page | Live at kandal.app |
