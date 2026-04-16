@@ -27,3 +27,8 @@ class Preferences(BaseModel):
     love_language_receiving: list[str] = []
     conflict_style: str | None = None
     relationship_history: str | None = None
+    # Spark MCQ results — categorical first-date signals
+    humor_style: str | None = None
+    conversational_texture: str | None = None
+    energy_pace: str | None = None
+    ambition_shape: str | None = None

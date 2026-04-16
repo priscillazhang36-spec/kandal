@@ -40,9 +40,21 @@ class InferredTraits(BaseModel):
     birth_time_approx: str | None = None   # "HH:00-HH:00" 3hr window
     birth_city: str | None = None
     dimension_weights: dict[str, float] | None = None  # personalized scoring priorities
-    # Emotional dynamics — the core matching signal
+    # Emotional dynamics — the core long-term matching signal
     emotional_giving: str | None = None    # how this person makes partners feel
     emotional_needs: str | None = None     # what they need to feel from a partner
+    # Spark signals — what creates the initial hit on a first date
+    taste_fingerprint: str | None = None   # 3 things they'd recommend, any category
+    current_obsession: str | None = None   # what they're in right now
+    two_hour_topic: str | None = None      # what they could talk about for hours
+    contradiction_hook: str | None = None  # "I'm a [ ] who also [ ]"
+    past_attraction: str | None = None     # what pulled them in last time — real not stated
+    favorite_places: list[dict] | None = None  # [{"name","type","neighborhood","note"}]
+    # Spark MCQ results — categorical first-date signals
+    humor_style: str | None = None
+    conversational_texture: str | None = None
+    energy_pace: str | None = None
+    ambition_shape: str | None = None
     # Tier 1 tag lists — extracted from conversation
     interests: list[str] | None = None
     personality: list[str] | None = None
