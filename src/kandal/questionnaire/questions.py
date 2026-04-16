@@ -1,4 +1,15 @@
-"""Scenario-based question bank for inferring Tier 2 compatibility traits."""
+"""Long-term compatibility scenario MCQs. These are secondary signals —
+the LLM judge uses them to sanity-check pairs flagged by spark matching,
+not as primary ranking criteria. Kept intentionally small (4 questions)
+since the freeform conversation + basics MCQs + spark MCQs already do
+most of the work.
+
+Coverage:
+- Q1: partner cancels → attachment + conflict (covers all 4 attachment styles)
+- Q2: after-argument repair → love_giving + conflict
+- Q3: felt truly loved → love_receiving
+- Q4: relationship history → history
+"""
 
 QUESTIONS = [
     {
@@ -31,130 +42,6 @@ QUESTIONS = [
     },
     {
         "id": 2,
-        "text": (
-            "Your partner had a terrible day. "
-            "How do you most naturally try to make it better?"
-        ),
-        "options": [
-            {
-                "text": "I'd tell them exactly what I admire about how they handled it.",
-                "signals": {"love_giving:words_of_affirmation": 1},
-            },
-            {
-                "text": "I'd clear my schedule and just be fully present with them.",
-                "signals": {"love_giving:quality_time": 1},
-            },
-            {
-                "text": (
-                    "I'd handle something on their to-do list "
-                    "— cook dinner, run an errand."
-                ),
-                "signals": {"love_giving:acts_of_service": 1},
-            },
-            {
-                "text": "I'd give them a long hug or a back rub without saying much.",
-                "signals": {"love_giving:physical_touch": 1},
-            },
-        ],
-    },
-    {
-        "id": 3,
-        "text": (
-            "You and your partner disagree about something "
-            "that matters to both of you. What do you do?"
-        ),
-        "options": [
-            {
-                "text": (
-                    "Sit down right now and talk it through, "
-                    "even if it's uncomfortable."
-                ),
-                "signals": {"conflict:talk_immediately": 1, "attachment:secure": 1},
-            },
-            {
-                "text": (
-                    "Try to find a solution that works for both of us, "
-                    "even if it takes a while."
-                ),
-                "signals": {"conflict:collaborative": 1, "attachment:secure": 1},
-            },
-            {
-                "text": (
-                    "I need to go for a walk first. "
-                    "I can't think straight when emotions are high."
-                ),
-                "signals": {"conflict:need_space": 1, "attachment:avoidant": 1},
-            },
-            {
-                "text": "I tend to go quiet and hope it resolves itself.",
-                "signals": {"conflict:avoidant": 1, "attachment:disorganized": 1},
-            },
-        ],
-    },
-    {
-        "id": 4,
-        "text": (
-            "It's your birthday. Which of these from a partner "
-            "would mean the most to you?"
-        ),
-        "options": [
-            {
-                "text": "A heartfelt letter telling me what I mean to them.",
-                "signals": {"love_receiving:words_of_affirmation": 1},
-            },
-            {
-                "text": "A full day planned together doing my favorite things.",
-                "signals": {"love_receiving:quality_time": 1},
-            },
-            {
-                "text": (
-                    "A gift that shows they've been paying attention "
-                    "to something I mentioned months ago."
-                ),
-                "signals": {"love_receiving:gifts": 1},
-            },
-            {
-                "text": "Honestly, just being held and feeling close.",
-                "signals": {"love_receiving:physical_touch": 1},
-            },
-        ],
-    },
-    {
-        "id": 5,
-        "text": (
-            "You've been seeing someone for a few weeks. "
-            "They don't text you for a full day. What goes through your head?"
-        ),
-        "options": [
-            {
-                "text": "They're probably just busy. I'll hear from them.",
-                "signals": {"attachment:secure": 1},
-            },
-            {
-                "text": (
-                    "I start replaying our last conversation "
-                    "wondering if I said something wrong."
-                ),
-                "signals": {"attachment:anxious": 1},
-            },
-            {
-                "text": (
-                    "I honestly might not notice for a while "
-                    "— I get absorbed in my own stuff."
-                ),
-                "signals": {"attachment:avoidant": 1},
-            },
-            {
-                "text": (
-                    "Part of me is relieved, part of me is panicking. "
-                    "I don't know which feeling to trust."
-                ),
-                "signals": {"attachment:disorganized": 1},
-            },
-        ],
-    },
-    {
-        "id": 6,
         "text": "After an argument is resolved, how do you reconnect?",
         "options": [
             {
@@ -194,38 +81,7 @@ QUESTIONS = [
         ],
     },
     {
-        "id": 7,
-        "text": (
-            "Your partner seems distant for a few days "
-            "but says 'I'm fine.' How do you handle it?"
-        ),
-        "options": [
-            {
-                "text": (
-                    "I give them space but let them know "
-                    "I'm here when they're ready."
-                ),
-                "signals": {"attachment:secure": 1, "conflict:collaborative": 1},
-            },
-            {
-                "text": "I keep checking in. The uncertainty eats at me.",
-                "signals": {"attachment:anxious": 1, "conflict:talk_immediately": 1},
-            },
-            {
-                "text": "I match their energy. If they want distance, fine by me.",
-                "signals": {"attachment:avoidant": 1, "conflict:need_space": 1},
-            },
-            {
-                "text": (
-                    "I oscillate — one minute I want to confront them, "
-                    "the next I want to disappear."
-                ),
-                "signals": {"attachment:disorganized": 1, "conflict:avoidant": 1},
-            },
-        ],
-    },
-    {
-        "id": 8,
+        "id": 3,
         "text": "Think about a time you felt truly loved. What was happening?",
         "options": [
             {
@@ -255,7 +111,7 @@ QUESTIONS = [
         ],
     },
     {
-        "id": 9,
+        "id": 4,
         "text": "Which best describes your relationship history?",
         "options": [
             {
@@ -279,36 +135,6 @@ QUESTIONS = [
                     "— this is relatively new for me."
                 ),
                 "signals": {"history:limited_experience": 1},
-            },
-        ],
-    },
-    {
-        "id": 10,
-        "text": (
-            "How comfortable are you being emotionally vulnerable "
-            "with a partner?"
-        ),
-        "options": [
-            {
-                "text": (
-                    "Very — I think openness is what makes relationships work."
-                ),
-                "signals": {"attachment:secure": 1, "conflict:talk_immediately": 1},
-            },
-            {
-                "text": "I want to be, but I worry about being 'too much.'",
-                "signals": {"attachment:anxious": 1, "conflict:collaborative": 1},
-            },
-            {
-                "text": "I find it hard. I process things internally.",
-                "signals": {"attachment:avoidant": 1, "conflict:need_space": 1},
-            },
-            {
-                "text": (
-                    "It depends on the day. "
-                    "Sometimes I overshare, sometimes I shut down."
-                ),
-                "signals": {"attachment:disorganized": 1, "conflict:avoidant": 1},
             },
         ],
     },
