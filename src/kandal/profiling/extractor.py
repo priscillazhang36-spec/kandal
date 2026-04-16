@@ -274,60 +274,21 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]
     data = _parse_json_response(response.content[0].text)
     low_conf: set[str] = set()
 
-    # Defensive check: if user never used love-behavior language, force LL to low_conf
-    # regardless of what the extractor LLM returned. Haiku sometimes infers LL from
-    # personality MCQs despite the prompt forbidding it — this is the safety net.
-    ll_behaviors_present = _user_mentioned_love_behaviors(messages)
-
-    # Validate core traits — track which were defaulted vs signaled
-    raw_attachment = data.get("attachment_style")
-    if raw_attachment in VALID_ATTACHMENT_STYLES and _has_phrase(messages, _ATTACHMENT_PHRASES):
-        attachment = raw_attachment
-    else:
-        attachment = "secure"
-        low_conf.add("attachment_style")
-
-    raw_conflict = data.get("conflict_style")
-    if raw_conflict in VALID_CONFLICT_STYLES and _has_phrase(messages, _CONFLICT_PHRASES):
-        conflict = raw_conflict
-    else:
-        conflict = "collaborative"
-        low_conf.add("conflict_style")
-
-    raw_history = data.get("relationship_history")
-    if raw_history in VALID_RELATIONSHIP_HISTORIES and _has_phrase(messages, _HISTORY_PHRASES):
-        history = raw_history
-    else:
-        history = "limited_experience"
-        low_conf.add("relationship_history")
-
-    raw_giving = data.get("love_language_giving")
-    if (
-        ll_behaviors_present
-        and isinstance(raw_giving, list)
-        and any(l in VALID_LOVE_LANGUAGES for l in raw_giving)
-    ):
-        giving = [l for l in raw_giving if l in VALID_LOVE_LANGUAGES]
-        for lang in VALID_LOVE_LANGUAGES:
-            if lang not in giving:
-                giving.append(lang)
-    else:
-        giving = VALID_LOVE_LANGUAGES[:]
-        low_conf.add("love_language_giving")
-
-    raw_receiving = data.get("love_language_receiving")
-    if (
-        ll_behaviors_present
-        and isinstance(raw_receiving, list)
-        and any(l in VALID_LOVE_LANGUAGES for l in raw_receiving)
-    ):
-        receiving = [l for l in raw_receiving if l in VALID_LOVE_LANGUAGES]
-        for lang in VALID_LOVE_LANGUAGES:
-            if lang not in receiving:
-                receiving.append(lang)
-    else:
-        receiving = VALID_LOVE_LANGUAGES[:]
-        low_conf.add("love_language_receiving")
+    # Long-term compatibility traits (attachment, love languages, conflict,
+    # history) are NO LONGER extracted from freeform conversation — they come
+    # from the post-summary long-term MCQ loop (questionnaire/questions.py). We
+    # default them here and mark as low_conf so the summary doesn't mention them.
+    # The post-summary MCQ loop overwrites them with real signal.
+    attachment = "secure"
+    low_conf.add("attachment_style")
+    conflict = "collaborative"
+    low_conf.add("conflict_style")
+    history = "limited_experience"
+    low_conf.add("relationship_history")
+    giving = VALID_LOVE_LANGUAGES[:]
+    low_conf.add("love_language_giving")
+    receiving = VALID_LOVE_LANGUAGES[:]
+    low_conf.add("love_language_receiving")
 
     narrative = data.get("narrative", "")
 
@@ -362,28 +323,9 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]
     birth_time_approx = _normalize_birth_time(data.get("birth_time_approx"))
     birth_city = data.get("birth_city")
 
-    # Validate dimension_weights: must be a dict with valid keys that sums to ~1.0
-    dimension_weights = data.get("dimension_weights")
-    if isinstance(dimension_weights, dict):
-        from kandal.scoring.engine import DIMENSION_WEIGHTS
-        valid_dims = set(DIMENSION_WEIGHTS.keys())
-        # Keep only valid dimension keys with numeric values
-        dimension_weights = {
-            k: float(v) for k, v in dimension_weights.items()
-            if k in valid_dims and isinstance(v, (int, float)) and v >= 0
-        }
-        # Normalize to sum to 1.0
-        total = sum(dimension_weights.values())
-        if total > 0 and dimension_weights:
-            dimension_weights = {k: round(v / total, 4) for k, v in dimension_weights.items()}
-            # Fill missing dimensions with 0
-            for dim in valid_dims:
-                if dim not in dimension_weights:
-                    dimension_weights[dim] = 0.0
-        else:
-            dimension_weights = None
-    else:
-        dimension_weights = None
+    # dimension_weights: no longer extracted from conversation (ranking question
+    # removed). Kept as null on the model; the LLM judge reads raw signals.
+    dimension_weights = None
 
     # Emotional dynamics — the core matching signal
     emotional_giving = data.get("emotional_giving")
@@ -393,6 +335,38 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]
     emotional_needs = data.get("emotional_needs")
     if not isinstance(emotional_needs, str) or len(emotional_needs.strip()) < 10:
         emotional_needs = None
+
+    # Spark signals — freeform text fields
+    def _spark_text(key: str, min_len: int = 5) -> str | None:
+        v = data.get(key)
+        if not isinstance(v, str) or len(v.strip()) < min_len:
+            return None
+        return v.strip()
+
+    taste_fingerprint = _spark_text("taste_fingerprint")
+    current_obsession = _spark_text("current_obsession")
+    two_hour_topic = _spark_text("two_hour_topic")
+    contradiction_hook = _spark_text("contradiction_hook")
+    past_attraction = _spark_text("past_attraction")
+
+    # favorite_places: list of dicts with name/type/(neighborhood)/(note)
+    raw_places = data.get("favorite_places")
+    favorite_places: list[dict] | None = None
+    if isinstance(raw_places, list):
+        cleaned_places: list[dict] = []
+        for p in raw_places:
+            if not isinstance(p, dict):
+                continue
+            name = p.get("name")
+            if not isinstance(name, str) or not name.strip():
+                continue
+            place = {"name": name.strip()}
+            for k in ("type", "neighborhood", "note"):
+                v = p.get(k)
+                if isinstance(v, str) and v.strip():
+                    place[k] = v.strip()
+            cleaned_places.append(place)
+        favorite_places = cleaned_places or None
 
     # Tier 1 tag lists — validate as lists of strings
     interests = data.get("interests")
@@ -478,6 +452,12 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]
         dimension_weights=dimension_weights,
         emotional_giving=emotional_giving,
         emotional_needs=emotional_needs,
+        taste_fingerprint=taste_fingerprint,
+        current_obsession=current_obsession,
+        two_hour_topic=two_hour_topic,
+        contradiction_hook=contradiction_hook,
+        past_attraction=past_attraction,
+        favorite_places=favorite_places,
         interests=interests,
         personality=personality,
         partner_personality=partner_personality,
