@@ -30,18 +30,16 @@ VALID_RELATIONSHIP_HISTORIES = [
 ]
 VALID_GENDERS = ["male", "female", "nonbinary"]
 
+# Spark-focused pillars — these are what the freeform conversation collects.
+# Long-term compatibility signals (attachment, love languages, conflict style,
+# history) and logistics (birthday, gender preference, kids, etc.) are collected
+# *after* the conversation via deterministic MCQ loops — not chased here.
 TRAIT_DIMENSIONS = [
-    "attachment_style",
-    "love_language_giving",
-    "love_language_receiving",
-    "conflict_style",
-    "relationship_history",
-    "partner_preferences",
-    "birth_info",
-    "matching_priorities",
-    "emotional_dynamics",
-    "interests_and_lifestyle",
-    "lifestyle_basics",
+    "spark_aliveness",      # current obsession + what they'd talk about for hours
+    "spark_taste",          # 3 specific recs + favorite places in their city
+    "spark_attraction",     # past attraction + contradiction hook
+    "emotional_dynamics",   # how it feels to be loved by them + what they need back
+    "partner_vibe",         # the kind of person they're looking for
 ]
 
 RUNTIME_CONTEXT_TEMPLATE = """\
@@ -70,11 +68,10 @@ if the conversation is going somewhere alive, follow it and circle back later.
 
 **When to switch to scenario-based multiple choice (USE THIS AGGRESSIVELY):**
 
-Trigger the MCQ tool from your soul guide ANY time the user signals they can't \
-articulate something. Specific triggers — if you see ANY of these on a deeper \
-question (attachment, love languages, conflict, emotional needs, what they're \
-looking for, values), don't ask another open question — pivot to MCQ on the very \
-next message:
+The abstract pillars you're collecting — *emotional dynamics* (how it feels to \
+be loved by them, what they need to feel loved), *partner vibe* (what kind of \
+person they want) — are hard to answer cold. If the user signals they can't \
+articulate something, pivot to MCQ on the very next message:
   - "idk" / "I don't know" / "not sure" / "hard to say" / "hmm"
   - One-to-five word answers like "I guess so" / "yeah maybe" / "kinda"
   - Generic non-answers like "depends" / "it varies" / "all of them"
@@ -85,6 +82,12 @@ Format: 3-4 concrete options labeled A/B/C/D, plus an explicit "or tell me in \
 your own words" out. People who can't answer abstractly can almost always pick \
 from concrete scenarios. Reach for this PROACTIVELY on the abstract pillars — \
 don't wait for them to get stuck twice. One short stuck-signal is enough.
+
+**What NOT to ask about in freeform:** attachment style, love languages, \
+conflict style, relationship history, birthday, location, gender preference, \
+age range, kids, religion, substances. All of that is collected via structured \
+MCQs after this conversation — if you ask about it here you're duplicating work \
+and making the user fill out a form twice.
 
 If even multiple-choice doesn't land, drop it and try a different angle later. \
 Nobody likes feeling cornered.
@@ -105,97 +108,79 @@ relative to their pool.
 
 EXTRACTION_SYSTEM_PROMPT = """\
 You are a personality analyst. Read the following matchmaking conversation and \
-extract the person's traits. Also write a concise ~80 word "matchmaker's notes" \
-narrative — bullet-point style, facts only.
+extract what this person is actually like — the spark signals a first date would \
+turn on. Also write a concise ~80 word "matchmaker's notes" narrative — bullet \
+style, facts only.
 
 CRITICAL: Only extract what the person EXPLICITLY said or clearly demonstrated. \
-Do NOT infer, assume, or fill in gaps. If they never mentioned cultural preferences, \
-use null — do NOT assume "open to everyone." If they didn't clearly indicate an \
-attachment style, pick the closest match but note your confidence. The narrative \
-should only contain information the person actually shared — no assumptions, no \
+Do NOT infer, assume, or fill in gaps. If they never mentioned cultural \
+preferences, use null — do NOT assume "open to everyone." The narrative should \
+only contain information the person actually shared — no assumptions, no \
 extrapolations, no "they seem like" guesses.
 
-The narrative should include: key relationship priorities, dealbreakers, \
-communication patterns, emotional needs, and any specific preferences mentioned. \
-No filler, no literary commentary, no interpreting what references "really mean." \
-Just what this person said and how they described their relationship patterns.
+The narrative should capture: current obsessions, taste specifics, how they \
+show up emotionally, what kind of person they're drawn to, and any distinctive \
+details they mentioned. No filler, no literary commentary.
 
 You must return valid JSON matching this exact schema:
 {
-  "attachment_style": one of ["secure", "anxious", "avoidant", "disorganized"] — pick the closest match based on what they described,
-  "love_language_giving": ranked list of all 5: ["words_of_affirmation", "quality_time", "physical_touch", "acts_of_service", "gifts"] — ONLY if they explicitly described specific actions they take for partners (e.g. "I cook dinners" → acts_of_service, "I write notes" → words_of_affirmation). Use null if they never described concrete loving actions. Do NOT infer love languages from abstract personality descriptions, multiple-choice answers about being "active" or "steady," or from emotional needs. The five categories require direct behavioral evidence.,
-  "love_language_receiving": ranked list of all 5 (same options) — ONLY if they explicitly said what makes them feel loved (e.g. "I need to hear it" → words_of_affirmation, "I need them to plan things" → acts_of_service). Use null if they only described abstract needs like "feeling secure" or "feeling seen." Same rule: no inference from MCQ choices or personality.,
-  "conflict_style": one of ["talk_immediately", "need_space", "avoidant", "collaborative"] — based on what they described doing during conflict,
-  "relationship_history": one of ["long_term", "mostly_casual", "recently_out_of_ltr", "limited_experience"] — ONLY based on what they explicitly shared about past relationships,
-  "gender_preference": list like ["male"] or ["female"] or ["male","female","nonbinary"] — ONLY if they explicitly stated who they're attracted to. Use null if never mentioned. Do NOT guess from context clues.,
-  "cultural_preferences": list of any cultural/racial preferences they EXPLICITLY mentioned, or null if never discussed. Do NOT default to "open to everyone" — if it wasn't discussed, use null.,
   "name": their first name if they mentioned it, or null,
   "gender": one of ["male", "female", "nonbinary"] if clearly stated or obvious from context, or null,
   "current_city": the city they currently live in if mentioned, or null. This is different from birth_city.,
-  "birth_date": "YYYY-MM-DD" ONLY if YEAR + MONTH + DAY were all explicitly shared (possibly across multiple turns — e.g. they said "11/28" then said "1996" in a later message; combine them). If any of year/month/day is missing, use null. NEVER guess or fabricate the year — leave the whole field null rather than invent one.,
-  "birth_time_approx": approximate birth time as "HH:00-HH:00" (3hr window) if shared — convert "morning" to "06:00-09:00", "afternoon" to "12:00-15:00", "evening" to "18:00-21:00", "night" to "21:00-00:00", "early morning" to "03:00-06:00". Use null if not shared.,
-  "birth_city": city name if they shared where they were born, or null,
-  "emotional_giving": "~40 word description of how this person makes partners feel — their emotional strengths, how they show care, what being loved by them is like. Distill from what they said about how they show up in relationships. Use null if not enough signal.",
-  "emotional_needs": "~40 word description of what this person needs to feel from a partner — what makes them feel cared for, safe, and like the best version of themselves. Distill from what they explicitly said they need. Use null if not enough signal.",
-  "interests": list of hobby/interest tags based on what they EXPLICITLY mentioned — e.g. ["hiking", "cooking", "reading", "live_music", "travel", "gaming", "fitness"]. Use short lowercase tags. Only include things they actually said they do or enjoy. Use null if they didn't mention any hobbies or interests.,
-  "personality": list of personality tags describing THIS PERSON based on what they DEMONSTRATED in conversation — e.g. ["introverted", "adventurous", "creative", "analytical", "empathetic", "spontaneous", "ambitious"]. Infer from how they talk and what they described, not self-labels. Use null if not enough signal.,
-  "partner_personality": list of personality tags describing what this person WANTS IN A PARTNER — e.g. ["curious", "independent", "grounded", "playful"]. Infer from what they said they're attracted to, what they need, or what worked/didn't in past relationships. This is often different from their own personality. Use null if not enough signal.,
-  "values": list of value tags that THIS PERSON holds — e.g. ["family", "independence", "honesty", "ambition", "spirituality", "humor", "loyalty", "growth"]. Only include values they explicitly mentioned or strongly implied. Use null if not enough signal.,
-  "partner_values": list of value tags this person WANTS THEIR PARTNER TO HAVE — e.g. ["loyalty", "ambition", "emotional_intelligence"]. Infer from what they said matters in a partner, what they described needing, or dealbreakers they mentioned. Use null if not enough signal.,
-  "lifestyle": list of lifestyle tags based on what they described — e.g. ["early_bird", "night_owl", "homebody", "social", "active", "city_person", "outdoorsy", "pet_owner"]. Only from what they explicitly shared. Use null if not enough signal.,
-  "age_min": minimum acceptable partner age (int) if they specified a range, else null,
-  "age_max": maximum acceptable partner age (int) if they specified a range, else null,
-  "max_distance_km": max distance in km they'd date (int). Convert miles → km. "same city" ≈ 25, "metro area" ≈ 50, "open to long distance" → null. Use null if not discussed.,
-  "relationship_intent": one of ["casual", "dating", "serious", "marriage_track"] if they expressed what they're looking for, else null,
-  "has_kids": "yes" or "no" if they said, else null,
-  "wants_kids": one of ["yes", "no", "maybe", "open"] if they expressed a view, else null,
-  "relationship_structure": one of ["monogamous", "enm", "poly", "open"] if they said, else null,
-  "religion": free-text religion/spirituality label if they named one (e.g. "christian", "buddhist", "spiritual_not_religious", "atheist"), else null,
-  "religion_importance": one of ["not_important", "somewhat", "very"] if they indicated how much it matters, else null,
-  "drinks": one of ["never", "socially", "regularly"] if mentioned, else null,
-  "smokes": one of ["never", "socially", "regularly"] for tobacco if mentioned, else null,
-  "cannabis": one of ["never", "socially", "regularly"] if mentioned, else null,
-  "dimension_weights": personalized weights reflecting what this person cares about most — a dict mapping dimension names to floats that MUST sum to 1.0. The dimensions are: "interest_overlap", "personality_match", "values_alignment", "lifestyle_signals", "communication_style", "attachment_style", "love_language_fit", "conflict_style", "relationship_history", "bazi_compatibility", "emotional_fit". Infer from what they emphasized: if they talked a lot about wanting someone who handles conflict well, boost conflict_style. If they care about shared hobbies, boost interest_overlap. If they mentioned zodiac/destiny/spiritual compatibility, boost bazi_compatibility. If they talked about how someone makes them feel, boost emotional_fit. If they didn't express clear priorities, use null and we'll fall back to defaults.,
+  "birth_date": "YYYY-MM-DD" ONLY if YEAR + MONTH + DAY were all explicitly shared. Usually null (birthday is collected via basics MCQ later).,
+  "birth_time_approx": "HH:00-HH:00" 3hr window if shared, else null (usually null).,
+  "birth_city": city name if shared, else null (usually null).,
+  "gender_preference": list like ["male"] or ["female"] or ["male","female","nonbinary"] — ONLY if they explicitly stated who they're attracted to. Use null if never mentioned. Usually null (collected via basics MCQ later).,
+  "cultural_preferences": list of any cultural/racial preferences they EXPLICITLY mentioned, or null if never discussed. Do NOT default to "open to everyone.",
+  "emotional_giving": "~40 word description of how this person makes partners feel — their emotional strengths, how they show care, what being loved by them is like. Distill from what they said. Use null if not enough signal.",
+  "emotional_needs": "~40 word description of what this person needs to feel from a partner to be their best self. Distill from what they explicitly said they need. Use null if not enough signal.",
+  "taste_fingerprint": "~30 word snapshot of their taste — the specific things they'd recommend (restaurants, bands, books, shows, YouTube channels, whatever). Specifics only, no categories. Use null if they didn't name specific things.",
+  "current_obsession": "~25 word note on what's firing in them right now — a rabbit hole, a project, a phase. What's taking up their brain. Use null if they didn't describe one.",
+  "two_hour_topic": "~20 word note on what they could talk about for hours — a domain, a weird niche interest, a debate they'd pick up. Use null if not shared.",
+  "contradiction_hook": "the 'I'm a [ ] who also [ ]' surprise — the thing a stranger wouldn't guess from their surface. ~20 words. Use null if nothing distinctive emerged.",
+  "past_attraction": "~30 word note on what actually pulled them in last time — from a specific past relationship or crush, not a checklist. Use null if they didn't share.",
+  "favorite_places": "list of 1-5 objects like [{\\"name\\": \\"...\\", \\"type\\": \\"cafe|restaurant|park|bar|bookstore|other\\", \\"neighborhood\\": \\"...\\" (optional), \\"note\\": \\"...\\" (optional, why they love it)}]. Use null if they didn't name specific spots.",
+  "interests": list of hobby/interest tags based on what they EXPLICITLY mentioned — e.g. ["hiking", "cooking", "reading", "live_music", "travel", "gaming", "fitness"]. Short lowercase tags. Use null if none mentioned.,
+  "personality": list of personality tags describing THIS PERSON based on what they DEMONSTRATED in conversation — e.g. ["introverted", "adventurous", "creative", "analytical", "empathetic", "spontaneous", "ambitious"]. Use null if not enough signal.,
+  "partner_personality": list of personality tags describing what this person WANTS IN A PARTNER — e.g. ["curious", "independent", "grounded", "playful"]. Use null if not enough signal.,
+  "values": list of value tags that THIS PERSON holds — e.g. ["family", "independence", "honesty", "ambition", "humor", "loyalty", "growth"]. Use null if not enough signal.,
+  "partner_values": list of value tags this person WANTS THEIR PARTNER TO HAVE. Use null if not enough signal.,
+  "lifestyle": list of lifestyle tags based on what they described — e.g. ["early_bird", "night_owl", "homebody", "social", "active", "city_person", "outdoorsy"]. Use null if not enough signal.,
   "narrative": "~80 word concise matchmaker's notes"
 }
 """
 
 COVERAGE_SYSTEM_PROMPT = """\
-You are analyzing a matchmaking conversation for trait signals. Based on the \
-conversation so far, estimate confidence (0.0 to 1.0) for each dimension.
+You are analyzing a matchmaking conversation for spark-signal coverage. Based \
+on the conversation so far, estimate confidence (0.0 to 1.0) for each dimension.
 
 Return valid JSON:
 {
-  "attachment_style": <float 0-1>,
-  "love_language_giving": <float 0-1>,
-  "love_language_receiving": <float 0-1>,
-  "conflict_style": <float 0-1>,
-  "relationship_history": <float 0-1>,
-  "partner_preferences": <float 0-1>,
-  "birth_info": <float 0-1>,
-  "matching_priorities": <float 0-1>,
+  "spark_aliveness": <float 0-1>,
+  "spark_taste": <float 0-1>,
+  "spark_attraction": <float 0-1>,
   "emotional_dynamics": <float 0-1>,
-  "interests_and_lifestyle": <float 0-1>,
-  "lifestyle_basics": <float 0-1>
+  "partner_vibe": <float 0-1>
 }
 
 0.0 = no signal at all, 0.5 = some hints, 0.7 = fairly confident, 1.0 = very clear.
 
-partner_preferences = whether we know their gender preference (REQUIRED for matching) and any \
-cultural preferences (optional — count as covered if they were asked and said no preference).
-birth_info = whether we have their birthday, approximate birth time, and birthplace.
-matching_priorities = whether we know (a) what kind of *person* they want — personality traits, \
-values, the vibe of their ideal partner — AND (b) what dimension matters most in compatibility \
-(shared interests, emotional connection, values, conflict handling, etc). Both halves needed for \
-high confidence; just one half = ~0.4.
-emotional_dynamics = whether we understand how this person makes partners feel AND what \
-they need to feel from a partner. Both sides needed for high confidence.
-interests_and_lifestyle = whether we know their hobbies, interests, what they do for fun, \
-and lifestyle signals (homebody vs social, early bird vs night owl, active vs relaxed, etc).
-lifestyle_basics = whether the structured basic-info MCQs were asked and answered. Counts as \
-covered only when you have signal on: relationship intent (casual/serious/etc), kids (have + want), \
-age range preference, distance preference. Religion importance and substances are nice-to-have but \
-not required. If fewer than 3 of the required ones have been asked, coverage <= 0.4.
+spark_aliveness = whether we know what's currently firing in them — a current \
+obsession, a rabbit hole, a project, a phase, or a topic they could talk about \
+for hours. Generic hobby mentions without real energy count as ~0.3.
+spark_taste = whether we have SPECIFIC recommendations they'd make (actual \
+restaurants, bands, books, shows, creators by name) AND/OR favorite places in \
+their city by name. Categories alone ("music", "restaurants") = 0.2 max. \
+Specifics + favorite places = 1.0.
+spark_attraction = whether we understand what pulled them in before — either \
+from a past person they cared about (what actually got them, not a checklist) \
+or the contradiction that makes them them ("I'm a X who also Y"). Either one \
+strong = 0.7; both = 1.0.
+emotional_dynamics = whether we understand how this person makes partners feel \
+AND what they need to feel from a partner. Both sides needed for high confidence.
+partner_vibe = whether we know the kind of *person* they're looking for — \
+personality, values, the feeling they want with someone. "Someone grounded who \
+can match my energy" = good signal; silence or "I don't know" = low.
 """
 
 SUMMARY_SYSTEM_PROMPT = """\
@@ -210,37 +195,21 @@ extracted traits below. Do NOT add information that wasn't discussed.
 - If a field is null, missing, or not listed below, do NOT mention it and do NOT \
 make assumptions about it. If cultural_preferences is null, do NOT say "open to all."
 - NEVER state an age, birth year, occupation, location, ethnicity, or other \
-demographic unless it is explicitly listed in the extracted traits. If the person \
-said "my birthday is November 28" but never gave a year, do NOT calculate or guess \
-their age, and do NOT invent a birth year (e.g. "born November 28, 1995"). \
-If the extracted traits show birth_date as null, do not mention birthday at all.
-- Same for love languages: if they aren't in the extracted traits below, do NOT \
-list them. Don't infer love languages from things like "I want someone steady" or \
-multiple-choice picks about personality — those are not love languages.
-- NEVER state attachment_style, conflict_style, or relationship_history as a bare \
-clinical label ("secure attachment," "avoidant," "long-term oriented") unless the \
-user explicitly used that vocabulary or described behavior that unambiguously \
-matches. If the extracted traits list one but you can't point to specific user \
-words that justify it, OMIT that section. Better silent than wrong. Describe what \
-they actually said in their own terms when possible.
+demographic unless it is explicitly listed in the extracted traits.
 - If you find yourself writing a number, check it came from the traits. If it \
 didn't, delete it.
-- NEVER state dimension weights, priority percentages, or a ranked list of what \
-matters most (e.g. "emotional fit is #1 priority (25%)"). Those are decided AFTER \
-this summary via a ranking question — you don't know them yet. Describe what \
-someone is looking for in plain language instead, without numbers or rank order.
 - Better to omit a section than to invent content for it.
 
 Include (only if present in the extracted traits):
-- How they show up for someone they love — what it feels like to be with them
-- What they need to feel from a partner to be their best self
-- Who they're into (gender preference, cultural preferences — only if explicitly stated)
-- How they love and want to be loved
-- How they deal with conflict
-- Their relationship background
-- Birthday/birth info if they shared it
-- What matters most to them in a match (their priorities)
-- Any standout things they mentioned
+- What's firing in them right now — their current obsession or two-hour topic
+- Their taste fingerprint — the specific things they'd recommend
+- Favorite places they named in their city
+- The contradiction hook — what makes them them
+- How they show up for someone they love (emotional_giving)
+- What they need to feel from a partner (emotional_needs)
+- What pulled them in last time (past_attraction) — only if they shared this
+- The kind of person they're looking for (partner_personality / partner_values)
+- Any standout specifics they mentioned
 
 Keep it under 250 words. End with:
 "Does this sound like you? Say 'yes' to lock it in, or tell me what I got wrong."
@@ -248,40 +217,33 @@ Keep it under 250 words. End with:
 
 
 _DIMENSION_PROMPTS = {
-    # Self pillars — how this person loves and shows up
-    "attachment_style": "How they react when someone they like pulls away, or how they feel when alone in a relationship",
-    "conflict_style": "What they do when there's a fight or disagreement — shut down, talk it out, need space, etc.",
-    "love_language_giving": "How they show care for someone they love (specific things they do)",
-    "love_language_receiving": "What makes them feel loved by a partner (what they need to receive)",
-    "relationship_history": "Their past relationship experience — long-term, casual, recently single, limited",
-    "emotional_dynamics": "How they make a partner FEEL when things are good, and what they need to feel from a partner",
-    # Partner pillars — what they're looking for. Without these, matching can't run.
-    "partner_preferences": (
-        "Who they're attracted to / want to date. Ask gender preference as a multiple-choice "
-        "question on its own — A) Men B) Women C) Non-binary folks D) Open to all E) Tell me "
-        "in your own words. Then, in a SEPARATE later message, ask cultural/background "
-        "preference as MCQ — A) No preference B) Yes, I have a preference (tell me). "
-        "Never bundle the two."
+    "spark_aliveness": (
+        "What's firing in them right now — a current obsession, a rabbit hole, "
+        "a project, a phase. Or a topic they could talk about for two hours "
+        "straight. The aliveness signal — what's taking up their brain this month."
     ),
-    "birth_info": (
-        "Birthday (year + month + day — follow up if partial), approximate birth time, "
-        "birthplace, and current city. Ask each as a separate short question, casually — "
-        "not as a form. If they can't remember birth time or don't know, move on."
+    "spark_taste": (
+        "Specific things they'd recommend — restaurants, bands, books, shows, "
+        "YouTube channels, anything. Push for actual names, not categories "
+        "('music' is nothing; 'Fleet Foxes' is a person). Also: 3 favorite "
+        "places in their city — a cafe, a park, a spot they actually go."
     ),
-    "lifestyle_basics": (
-        "Structured basic-info MCQs, one per message: age range for a partner, distance "
-        "(same city / ~50km / region / open to long distance), relationship intent "
-        "(casual / dating / serious / marriage-track), have kids (yes/no), want kids "
-        "(yes/no/maybe/open), relationship structure (monogamous / ENM / poly / open), "
-        "religion importance (not/somewhat/very — follow up for tradition if B or C), "
-        "and one casual combined ask on substances (drinks/smokes/weed: never/socially/regularly)."
+    "spark_attraction": (
+        "What actually pulled them in last time — from a specific past person "
+        "they cared about, not a checklist. The real moment. AND/OR: the "
+        "contradiction that makes them them — 'I'm a [ ] who also [ ]' — the "
+        "thing a stranger wouldn't guess. Frame gently on past attraction; "
+        "don't push if they don't want to go there."
     ),
-    "matching_priorities": (
-        "What kind of *person* they're looking for — personality traits, values, vibe. "
-        "Things like 'someone grounded who can match my energy' or 'ambitious but not consumed "
-        "by work.' Also, what they care about MOST in compatibility (shared interests vs emotional "
-        "connection vs values vs how they handle conflict). This is the 'what are you looking for' "
-        "question — phrase it like a friend asking, not a form."
+    "emotional_dynamics": (
+        "How they make a partner FEEL when things are good (the emotional "
+        "texture of being loved by them), and what they need to feel from a "
+        "partner to be their best self. Both sides."
+    ),
+    "partner_vibe": (
+        "The kind of person they're looking for — personality, values, the "
+        "feeling they want. Not a checklist. 'Someone who...' Phrase like a "
+        "friend asking, not a form. Pivot to MCQ if they get stuck."
     ),
 }
 
@@ -303,20 +265,46 @@ def build_conversation_prompt(
 
     # Tell the agent which phase it should be in based on progress
     ratio = questions_asked / max_questions if max_questions > 0 else 0
-    if ratio < 0.3:
-        phase_hint = "You are in PHASE 1 (vibes + lifestyle). Get them talking about their life — hobbies, interests, how they spend their time, their general vibe. Keep it light and fun. Do NOT ask about birthdays, gender preferences, or relationship stuff yet."
-    elif ratio < 0.8:
-        phase_hint = "You are in PHASE 2 (relationships + emotions). Go deeper into how they are in relationships — emotional dynamics, love languages, conflict style, attachment patterns, relationship history. Use what they already told you as bridges."
+    if ratio < 0.35:
+        phase_hint = (
+            "You are in PHASE 1 (aliveness + taste). Get them showing you who "
+            "they are — what they're currently obsessed with, what they'd "
+            "recommend, their favorite places in their city. Specifics, not "
+            "categories.\n\n"
+            "**Don't milk small talk.** Warmth is a tone, not a length. The "
+            "user's first answer is a BRIDGE, not a thread to unravel. Rules:\n"
+            "  - ONE clarifying follow-up max per topic, then pivot to a real "
+            "pillar. If they say 'kitties,' you get one light beat ('cat person "
+            "or admiring from afar?'), then you move on — don't ladder into "
+            "'do you have one → admiring — dedication → so what made you start "
+            "dating.' That's four turns burned on nothing.\n"
+            "  - If their answer is already pillar-signal (a current obsession, "
+            "a specific recommendation, a project) — chase THAT, don't detour.\n"
+            "  - Keep it curious and fun in tone, but move. You have ~5 turns "
+            "in phase 1 total; don't spend them all on one warm-up topic.\n\n"
+            "Do NOT ask about birthdays, gender preference, or relationship "
+            "logistics yet — those come later."
+        )
+    elif ratio < 0.75:
+        phase_hint = (
+            "You are in PHASE 2 (emotional texture + attraction). Go into how "
+            "it feels to be loved by them and what they need to feel from a "
+            "partner. If it's natural, ask what pulled them in before (past "
+            "attraction) — gently, don't push. Look for the contradiction hook "
+            "('I'm a X who also Y'). Use what they told you in phase 1 as bridges."
+        )
     else:
         phase_hint = (
-            "You are in PHASE 3 (closing out the qualitative conversation). Focus on "
-            "anything still missing about how they LOVE, how they FIGHT, and WHAT KIND "
-            "OF PERSON they're looking for (personality/values/vibe). "
+            "You are in PHASE 3 (partner vibe + anything still missing). Focus "
+            "on what kind of person they're looking for — personality, values, "
+            "the feeling. Phrase like a friend, not a form. Circle back to any "
+            "spark pillar that's still thin. "
             "**Do NOT ask about birthday, location, age range, distance, kids, "
-            "relationship structure, religion, or substances** — those are collected "
-            "separately after the summary. "
-            "If you genuinely have everything qualitative, just ask one last natural "
-            "follow-up or two. The system will take over from there."
+            "relationship structure, religion, substances, attachment style, "
+            "conflict style, or love languages** — all of that is collected "
+            "separately after the summary via structured MCQs. "
+            "If you genuinely have what you need, wrap with one last natural "
+            "follow-up. The system takes over from there."
         )
 
     # Pacing label — coverage-driven, what you'd tell the user if they asked.
@@ -414,37 +402,39 @@ def build_summary_prompt(
     """
     low_conf = low_conf or set()
     parts = ["Extracted traits (only mention what's listed below — do NOT invent anything else):\n"]
+    if traits.current_obsession:
+        parts.append(f"- Current obsession: {traits.current_obsession}\n")
+    if traits.two_hour_topic:
+        parts.append(f"- Could talk for hours about: {traits.two_hour_topic}\n")
+    if traits.taste_fingerprint:
+        parts.append(f"- Taste fingerprint: {traits.taste_fingerprint}\n")
+    if traits.favorite_places:
+        place_strs = []
+        for p in traits.favorite_places[:5]:
+            if isinstance(p, dict):
+                name = p.get("name") or ""
+                ptype = p.get("type") or ""
+                bit = f"{name} ({ptype})" if ptype else name
+                if bit:
+                    place_strs.append(bit)
+        if place_strs:
+            parts.append(f"- Favorite places: {', '.join(place_strs)}\n")
+    if traits.contradiction_hook:
+        parts.append(f"- Contradiction hook: {traits.contradiction_hook}\n")
+    if traits.past_attraction:
+        parts.append(f"- What pulled them in last time: {traits.past_attraction}\n")
     if traits.emotional_giving:
         parts.append(f"- How they show up for a partner: {traits.emotional_giving}\n")
     if traits.emotional_needs:
         parts.append(f"- What they need to feel: {traits.emotional_needs}\n")
-    if "attachment_style" not in low_conf:
-        parts.append(f"- Attachment style: {traits.attachment_style}\n")
-    if "love_language_giving" not in low_conf:
-        parts.append(f"- Gives love through: {', '.join(traits.love_language_giving[:3])}\n")
-    if "love_language_receiving" not in low_conf:
-        parts.append(f"- Wants to receive: {', '.join(traits.love_language_receiving[:3])}\n")
-    if "conflict_style" not in low_conf:
-        parts.append(f"- Conflict style: {traits.conflict_style}\n")
-    if "relationship_history" not in low_conf:
-        parts.append(f"- Relationship history: {traits.relationship_history}\n")
+    if traits.partner_personality:
+        parts.append(f"- Partner personality they want: {', '.join(traits.partner_personality)}\n")
+    if traits.partner_values:
+        parts.append(f"- Partner values they want: {', '.join(traits.partner_values)}\n")
     if traits.gender_preference:
         parts.append(f"- Attracted to: {', '.join(traits.gender_preference)}\n")
     if traits.cultural_preferences:
         parts.append(f"- Cultural preferences: {', '.join(traits.cultural_preferences)}\n")
-    if traits.birth_date:
-        birth_line = f"- Birthday: {traits.birth_date}"
-        if traits.birth_time_approx:
-            birth_line += f" (approx time: {traits.birth_time_approx})"
-        if traits.birth_city:
-            birth_line += f", born in {traits.birth_city}"
-        parts.append(birth_line + "\n")
-
-    if traits.dimension_weights:
-        # Show top 3 priorities
-        sorted_dims = sorted(traits.dimension_weights.items(), key=lambda x: x[1], reverse=True)
-        top_3 = [f"{d.replace('_', ' ')} ({w:.0%})" for d, w in sorted_dims[:3]]
-        parts.append(f"- Top matching priorities: {', '.join(top_3)}\n")
 
     parts.append(f"\nMatchmaker's notes:\n{narrative}")
     return "".join(parts)
