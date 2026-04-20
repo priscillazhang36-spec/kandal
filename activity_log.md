@@ -112,6 +112,26 @@
 - **Ranking removed** — Dimension-weight ranking question gone; Stage B LLM judge will read raw signals directly. `dimension_weights` retained nullable on models for backcompat
 - **Tests** — 74 passing; questionnaire tests updated for the 4-question set
 
+## Phase 10: Matching Pipeline Simplification
+**What:** Collapsed the matching pipeline from 3 stages to 2 after realizing Stage 2 (embedding-based coarse ranking) was effectively dead code — the LLM judge was told to ignore its output, and for pools under 25 users the top-K cutoff was bypassed anyway.
+
+- **Stage 2 removed** — Deleted `scoring/engine.py` (DIMENSION_WEIGHTS, score_compatibility, all tier-1/tier-2 scorers, Voyage embedding wrappers, cosine similarity helpers) and `scoring/verdict.py` (compute_verdict, selectivity thresholds)
+- **Pipeline is now** — dealbreaker filter → LLM judge on every passing pair → write matches above `LLM_MATCH_THRESHOLD = 0.7` (`src/kandal/scripts/match.py`)
+- **LLM judge simplified** — Dropped `coarse_score` parameter and the "for context only, don't anchor" line from the prompt (`src/kandal/scoring/llm_judge.py`)
+- **Match model/schema** — Made `breakdown` and `verdict` optional with defaults, since neither is populated anymore (`src/kandal/models/match.py`, `src/kandal/schemas/match.py`)
+- **Tests pruned** — Deleted `test_scoring.py`, `test_tier2_scoring.py`, `test_verdict.py` (all covered ripped code). 47 tests still passing.
+- **Not yet cleaned up (follow-ups)** — `scoring/bazi.py` no longer wired into matching; `profiling/embeddings.py` still populates `narrative_embedding` / `emotional_giving_embedding` / `emotional_needs_embedding` on profiles but nothing reads them; `matches.coarse_score` / `llm_score` / `breakdown` columns still on the DB (writes stopped, not dropped); `demo.py` references removed symbols and is broken; `.claude/docs/matching_algorithm_spec.md` describes the old 3-stage pipeline.
+
+## Phase 11: Synthetic Matching Test Harness
+**What:** Added a reproducible end-to-end test framework for the 2-stage matching pipeline that runs against isolated `test_*` tables and lets Claude in-session act as the judge (no Anthropic API calls).
+
+- **Test schema** — `test_profiles` / `test_preferences` mirror prod columns (`supabase/migrations/00015_test_tables.sql`). `test_matches` restructured to store *every* pair (including dealbreaker-failed) tagged by judging model, so the same pool can be re-judged across Opus / Haiku / prompt variants and compared (`00016_test_matches_all_pairs.sql`)
+- **Synthetic profiles** — `src/kandal/scripts/synthetic_profiles.py` provides a hand-crafted archetype pool with full narratives, spark fields, and preferences
+- **Two-phase driver** — `src/kandal/scripts/synthetic_test.py` splits into `gather` (clear tables, insert profiles, compute pair-level dealbreakers + judge cards) and `load` (read a verdicts JSON file and upsert rows tagged with `--model`). Claude reads the gather file between phases and writes the verdicts file directly
+- **Judge model parameterised** — `judge_pair()` now accepts a `model` kwarg defaulting to Haiku 4.5, so the same function can be used for prompt/model experiments
+- **Docs** — Full reproducible procedure in `docs/testing_matching.md` with pointer from `CLAUDE.md`
+- **First run** — Both Opus 4.7 and Haiku 4.5 judged the same 60 dealbreaker-passing pairs. Full agreement on top matches (Deshawn+Nora at 0.90/0.89); the 6 disagreements clustered at the 0.68–0.74 threshold boundary with Haiku scoring consistently more conservative
+
 ## Current State
 
 | Component | Status |
