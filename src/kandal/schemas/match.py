@@ -9,8 +9,8 @@ class MatchResponse(BaseModel):
     profile_a_id: UUID
     profile_b_id: UUID
     score: float
-    breakdown: dict
-    verdict: str
+    breakdown: dict = {}
+    verdict: str = "match"
     status: str = "pending_review"
     response_a: str | None = None
     response_b: str | None = None

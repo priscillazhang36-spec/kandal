@@ -1,12 +1,10 @@
-"""LLM-based pairwise compatibility judge — Stage 3 of the matching pipeline.
+"""LLM-based pairwise compatibility judge — Stage 2 of the matching pipeline.
 
 Stages:
 1. dealbreakers.passes_dealbreakers (hard filter)
-2. engine.score_compatibility (coarse ranker — weighted dimensions + embeddings)
-3. THIS MODULE (LLM judge on the top-K finalists per user)
+2. THIS MODULE (LLM judge on every passing pair)
 
 The LLM sees both narratives + key traits and returns a structured verdict.
-Embeddings can blur nuance; this stage catches what the coarse score misses.
 """
 
 from __future__ import annotations
@@ -107,30 +105,28 @@ def _format_person(label: str, profile: Profile, prefs: Preferences) -> str:
     return "\n".join(parts)
 
 
+DEFAULT_JUDGE_MODEL = "claude-haiku-4-5-20251001"
+
+
 def judge_pair(
     profile_a: Profile,
     prefs_a: Preferences,
     profile_b: Profile,
     prefs_b: Preferences,
-    coarse_score: float | None = None,
+    model: str = DEFAULT_JUDGE_MODEL,
 ) -> LLMVerdict | None:
     """Run the LLM compatibility judge on a single pair. Returns None on failure."""
     payload = (
         f"{_format_person('A', profile_a, prefs_a)}\n\n"
         f"{_format_person('B', profile_b, prefs_b)}\n"
     )
-    if coarse_score is not None:
-        payload += (
-            f"\n(For context only — coarse algorithmic score: {coarse_score:.2f}. "
-            "Don't anchor on it; trust your own read.)\n"
-        )
 
     settings = get_settings()
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     try:
         resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=model,
             max_tokens=600,
             system=_JUDGE_SYSTEM,
             messages=[{"role": "user", "content": payload}],
