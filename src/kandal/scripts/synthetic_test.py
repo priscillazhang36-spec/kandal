@@ -60,11 +60,23 @@ def _insert_profiles() -> None:
     client.table(PREFS_TABLE).insert(prefs_rows).execute()
 
 
+def _upsert_profiles() -> None:
+    client = get_supabase()
+    profile_rows = [p["profile"] for p in PROFILES]
+    prefs_rows = [p["prefs"] for p in PROFILES]
+    client.table(PROFILES_TABLE).upsert(profile_rows, on_conflict="id").execute()
+    client.table(PREFS_TABLE).upsert(prefs_rows, on_conflict="id").execute()
+
+
 def cmd_gather(args) -> None:
-    print("Clearing test tables...")
-    _clear_test_tables()
-    print(f"Inserting {len(PROFILES)} synthetic profiles...")
-    _insert_profiles()
+    if args.no_clear:
+        print(f"Upserting {len(PROFILES)} synthetic profiles (preserving test_matches)...")
+        _upsert_profiles()
+    else:
+        print("Clearing test tables...")
+        _clear_test_tables()
+        print(f"Inserting {len(PROFILES)} synthetic profiles...")
+        _insert_profiles()
 
     profiles, prefs = _load_users(PROFILES_TABLE, PREFS_TABLE)
     assert len(profiles) == len(PROFILES), f"Expected {len(PROFILES)} profiles, got {len(profiles)}"
@@ -110,6 +122,7 @@ def cmd_load(args) -> None:
             "profile_a_id": p["a_id"],
             "profile_b_id": p["b_id"],
             "model": args.model,
+            "experiment_run": args.experiment_run,
             "pass_dealbreaker": p["pass_dealbreaker"],
             "score": None,
             "is_matched": False,
@@ -141,13 +154,14 @@ def cmd_load(args) -> None:
         )
 
     get_supabase().table(MATCHES_TABLE).upsert(
-        rows, on_conflict="profile_a_id,profile_b_id,model"
+        rows, on_conflict="profile_a_id,profile_b_id,model,experiment_run"
     ).execute()
 
     matched = sum(1 for r in rows if r["is_matched"])
     judged = sum(1 for r in rows if r["score"] is not None)
     print(f"Wrote {len(rows)} rows to {MATCHES_TABLE} "
-          f"(model={args.model}, judged={judged}, matched={matched})")
+          f"(model={args.model}, experiment_run={args.experiment_run}, "
+          f"judged={judged}, matched={matched})")
 
 
 def main() -> None:
@@ -157,12 +171,22 @@ def main() -> None:
 
     g = sub.add_parser("gather", help="Clear tables, insert profiles, write pair cards + dealbreakers")
     g.add_argument("--out", default="/tmp/kandal_pairs.json")
+    g.add_argument(
+        "--no-clear",
+        action="store_true",
+        help="Preserve existing test_matches; upsert profiles/prefs instead of wiping",
+    )
     g.set_defaults(func=cmd_gather)
 
-    l = sub.add_parser("load", help="Write all pairs + verdicts to test_matches tagged with --model")
+    l = sub.add_parser("load", help="Write all pairs + verdicts to test_matches tagged with --model and --experiment-run")
     l.add_argument("--pairs", default="/tmp/kandal_pairs.json")
     l.add_argument("--verdicts", required=True)
     l.add_argument("--model", required=True)
+    l.add_argument(
+        "--experiment-run",
+        required=True,
+        help="Tag identifying this prompt/scoring variant (e.g. 'baseline', 'spark_first_v1')",
+    )
     l.set_defaults(func=cmd_load)
 
     args = parser.parse_args()

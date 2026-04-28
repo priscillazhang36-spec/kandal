@@ -132,6 +132,21 @@
 - **Docs** — Full reproducible procedure in `docs/testing_matching.md` with pointer from `CLAUDE.md`
 - **First run** — Both Opus 4.7 and Haiku 4.5 judged the same 60 dealbreaker-passing pairs. Full agreement on top matches (Deshawn+Nora at 0.90/0.89); the 6 disagreements clustered at the 0.68–0.74 threshold boundary with Haiku scoring consistently more conservative
 
+## Phase 12: Spark-first Judge Prompt Iteration (v2 → v3)
+
+**What:** Reworked the LLM judge prompt twice in one session after the Phase 11 baseline put register-mismatched pairs at the top of the list. Canary case: Deshawn+Nora scored 0.85+ across both models despite an obvious aesthete-craft (Ando, tasting board) vs grounded-utilitarian (hospital coffee, denim, burger) cultural-tribe mismatch — abstract trait similarity was masking a real first-date spark gap.
+
+- **v2 — payload reorder + fenced narrative** — Rewrote `_format_person` in `src/kandal/scoring/llm_judge.py` so spark signals (`current_obsession`, `two_hour_topic`, `taste_fingerprint`, `contradiction_hook`, `past_attraction`, `favorite_places`, MCQ texture fields) lead the payload and narrative + `emotional_giving` / `emotional_needs` are fenced as incompatibility-check-only inputs. System prompt updated to forbid upgrading scores from warm narrative.
+- **v3 — scene-imagination prompt** — v2 still anchored on life-stage compatibility because the prompt was structurally a checklist (list of dimensions + 80/20 weight math). v3 strips the criteria entirely and forces the judge to **imagine the first 20 minutes of the date as a written scene**, then score from the scene. Removed the bulleted dimension list, removed weight math, removed "INCOMPATIBILITY CHECK ONLY" header. Kept score distribution guidance and the deal-killer-only role for narrative.
+- **`scene` field added** — `LLMVerdict` dataclass gains `scene: str`; JSON output requires a 150-200 word scene as first field; `judge_pair()` parses + populates it. `max_tokens` bumped 600 → 1000 to accommodate the scene.
+- **DB schema** — `experiment_run` column added to `test_matches` so v1 / v2 / v3 verdicts can coexist tagged by prompt variant; unique constraint extended to include it (`supabase/migrations/00017_test_matches_experiment_run.sql`). `synthetic_test.py load` now takes `--experiment-run`.
+- **Validation against the 60-pair pool** — Re-judged via Opus 4.7 and Haiku 4.5 against the same `spark_first_v1` / `v2` profile pool. Pass criteria from the plan:
+  - **Deshawn+Nora dropped to 0.50** (Haiku v3) — register mismatch now detected
+  - **Genuine-spark pairs held**: Rafe+Nora 0.86, Elena+Leo 0.85, Maya+Leo + Ben+Maya + Ben+Elena 0.80, Ben+Mia 0.78
+  - **Matched count (≥0.7)**: 11 in Haiku v3 (vs 18 in v1, 14 in v2) — within the 8-14 target band
+  - **Scenes are concrete** — name actual artifacts/places/topics from each profile (Saunders paperback, McNally Jackson, Fort Tryon walk, hospital triage), not generic
+- **Cost-quality tradeoff observed** — Haiku v3 averages ~14% lower scores than Opus v3 with tighter scene prose, but holds the prompt structure: the high-spark and register-mismatch verdicts agree within 0.02-0.05 across models. Production default remains Haiku 4.5.
+
 ## Current State
 
 | Component | Status |

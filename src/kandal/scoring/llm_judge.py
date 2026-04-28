@@ -25,41 +25,66 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LLMVerdict:
     score: float          # 0.0 – 1.0
-    summary: str          # 1–2 sentence "why these two"
-    reasons: list[str]    # up to 3 concrete compatibility points
-    concerns: list[str]   # up to 2 honest concerns / friction points
+    scene: str            # imagined first 20 minutes of the date
+    summary: str          # 1 sentence: what the scene tells us
+    reasons: list[str]    # up to 3 concrete moments from the scene
+    concerns: list[str]   # up to 2 concrete moments that didn't land
 
 
 _JUDGE_SYSTEM = """\
-You are a sharp, honest matchmaker. You're looking at two people whose AI \
-friends (Kandals) think they might be a fit. Your job is to give a real read \
-on whether they'd actually click — not a polite read.
+You're a matchmaker reading two profiles. Don't checklist them. Imagine their \
+actual first date — Tuesday, 8pm, somewhere in the city. Picture the table, \
+the silences between turns, who orders first, what's said in the gap before \
+the food arrives.
 
-You will see each person's narrative profile and the key traits their Kandal \
-extracted. You are not graded on optimism. Most pairs are not great fits and \
-should score below 0.6. Reserve 0.8+ for pairs where you can clearly see them \
-working. Reserve 0.9+ for rare standouts.
+Walk through the first 20 minutes in your head and write it as a scene. \
+Specifically:
+- What's the first concrete thing they bond over (or fail to bond over)? \
+Drawn from a real artifact in their profiles, not abstract qualities.
+- When does one of them light up? Does the other notice and meet it, or let \
+it pass?
+- Where does it get awkward? Does it recover, or does the temperature drop?
+- By 8:30, are they leaning in or politely playing the clock?
 
-Think about:
-- Whether their emotional needs and giving styles meet each other
-- Whether their conflict styles will collide or repair
-- Whether their attachment patterns are likely to spiral or stabilize
-- Whether their values, interests, and lifestyle have enough overlap to share a life
-- Whether either has stated preferences the other clearly doesn't meet
+The spark fields and long-term traits in the payload are RAW MATERIAL FOR \
+YOUR IMAGINATION, not dimensions to match. Two grounded people with the same \
+kid timeline can be a dead date if their taste worlds don't actually talk to \
+each other. Two register-mismatched people (one aesthete, one utilitarian) \
+rarely click on date one, even when their abstract values align. Trust your \
+read of the cultural-tribe signal in their actual artifacts.
 
-Be honest about concerns even when scoring high. If they're a strong fit but \
-one person is recently out of an LTR, that's a concern worth noting.
+The narrative and emotional_giving / emotional_needs sections at the bottom \
+are background. You may use them to spot a hard incompatibility that would \
+tank the date (one needs constant reassurance, the other refuses emotional \
+labor; one is in active grief, the other is honeymoon-energy). You may NOT \
+use them to upgrade a score because the prose sounds emotionally compatible. \
+Warm narrative is not spark.
+
+After writing the scene, score from the scene. The score should follow from \
+what actually happened in the 20 minutes you imagined — not from a separate \
+trait checklist.
+
+Score distribution:
+- Most pairs lack spark and should score below 0.6.
+- 0.7+ for pairs where they'd both be telling a friend about the date later.
+- 0.8+ for pairs where the conversation writes itself.
+- 0.9+ for rare standouts where the spark is undeniable.
+
+You are not graded on optimism.
 
 Return ONLY valid JSON, no preamble:
 {
+  "scene": "<150-200 words, the imagined first 20 minutes — name specific \
+artifacts/places/topics from each profile, render at least one moment of \
+either click or miss>",
   "score": <float 0.0-1.0>,
-  "summary": "<one or two sentences explaining the read>",
-  "reasons": ["<concrete reason 1>", "<reason 2>", "<reason 3>"],
-  "concerns": ["<concern 1>", "<concern 2>"]
+  "summary": "<one sentence: what the scene tells us>",
+  "reasons": ["<concrete moment from the scene that worked>", "<...>", "<...>"],
+  "concerns": ["<concrete moment that didn't land or a real deal-killer>", "<...>"]
 }
 
-Keep reasons and concerns short — phrases, not paragraphs. Empty arrays are \
-fine if there's nothing to say.
+Reasons and concerns should cite specific moments from the scene you just \
+wrote, not generic restatements of trait labels. Empty arrays are fine.
 """
 
 
@@ -73,14 +98,41 @@ def _format_person(label: str, profile: Profile, prefs: Preferences) -> str:
         parts.append(f"Gender: {profile.gender}")
     if getattr(profile, "city", None):
         parts.append(f"City: {profile.city}")
-    if getattr(profile, "narrative", None):
-        parts.append(f"\nNarrative:\n{profile.narrative}")
-    if getattr(profile, "emotional_giving", None):
-        parts.append(f"\nHow they love: {profile.emotional_giving}")
-    if getattr(profile, "emotional_needs", None):
-        parts.append(f"What they need: {profile.emotional_needs}")
 
-    parts.append("\nTraits:")
+    spark_lines = []
+    if getattr(profile, "current_obsession", None):
+        spark_lines.append(f"- current obsession: {profile.current_obsession}")
+    if getattr(profile, "two_hour_topic", None):
+        spark_lines.append(f"- could talk for two hours about: {profile.two_hour_topic}")
+    if getattr(profile, "taste_fingerprint", None):
+        spark_lines.append(f"- taste fingerprint: {profile.taste_fingerprint}")
+    if getattr(profile, "contradiction_hook", None):
+        spark_lines.append(f"- contradiction: {profile.contradiction_hook}")
+    if getattr(profile, "past_attraction", None):
+        spark_lines.append(f"- past attraction pattern: {profile.past_attraction}")
+    if getattr(profile, "favorite_places", None):
+        place_names = [
+            str(p.get("name") or p.get("place") or p)
+            for p in profile.favorite_places
+            if p
+        ]
+        if place_names:
+            spark_lines.append(f"- favorite places: {', '.join(place_names)}")
+    if getattr(prefs, "humor_style", None):
+        spark_lines.append(f"- humor: {prefs.humor_style}")
+    if getattr(prefs, "conversational_texture", None):
+        spark_lines.append(f"- conversational texture: {prefs.conversational_texture}")
+    if getattr(prefs, "energy_pace", None):
+        spark_lines.append(f"- energy/pace: {prefs.energy_pace}")
+    if getattr(prefs, "ambition_shape", None):
+        spark_lines.append(f"- ambition shape: {prefs.ambition_shape}")
+    parts.append("\nSPARK SIGNALS (primary scoring inputs):")
+    if spark_lines:
+        parts.extend(spark_lines)
+    else:
+        parts.append("- (none extracted — score must be low)")
+
+    parts.append("\nLong-term traits (collision check only):")
     if prefs.attachment_style:
         parts.append(f"- attachment: {prefs.attachment_style}")
     if prefs.conflict_style:
@@ -101,6 +153,17 @@ def _format_person(label: str, profile: Profile, prefs: Preferences) -> str:
         parts.append(f"- wants partner who is: {', '.join(prefs.partner_personality)}")
     if getattr(prefs, "cultural_preferences", None):
         parts.append(f"- cultural preferences: {', '.join(prefs.cultural_preferences)}")
+
+    bg_lines = []
+    if getattr(profile, "narrative", None):
+        bg_lines.append(f"Narrative:\n{profile.narrative}")
+    if getattr(profile, "emotional_giving", None):
+        bg_lines.append(f"How they love: {profile.emotional_giving}")
+    if getattr(profile, "emotional_needs", None):
+        bg_lines.append(f"What they need: {profile.emotional_needs}")
+    if bg_lines:
+        parts.append("\nBackground (raw material — only treat as a score input if it reveals an active deal-killer):")
+        parts.extend(bg_lines)
 
     return "\n".join(parts)
 
@@ -127,7 +190,7 @@ def judge_pair(
     try:
         resp = client.messages.create(
             model=model,
-            max_tokens=600,
+            max_tokens=1000,
             system=_JUDGE_SYSTEM,
             messages=[{"role": "user", "content": payload}],
         )
@@ -137,6 +200,7 @@ def judge_pair(
         data = json.loads(text)
         return LLMVerdict(
             score=max(0.0, min(1.0, float(data["score"]))),
+            scene=str(data.get("scene", "")).strip(),
             summary=str(data.get("summary", "")).strip(),
             reasons=[str(r).strip() for r in (data.get("reasons") or [])][:3],
             concerns=[str(c).strip() for c in (data.get("concerns") or [])][:2],
