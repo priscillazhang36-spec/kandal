@@ -147,6 +147,21 @@
   - **Scenes are concrete** — name actual artifacts/places/topics from each profile (Saunders paperback, McNally Jackson, Fort Tryon walk, hospital triage), not generic
 - **Cost-quality tradeoff observed** — Haiku v3 averages ~14% lower scores than Opus v3 with tighter scene prose, but holds the prompt structure: the high-spark and register-mismatch verdicts agree within 0.02-0.05 across models. Production default remains Haiku 4.5.
 
+## Phase 13: Onboarding v4 — Moment Elicitation, Visual Prefs, Dealbreaker Wiring
+
+**What:** Rewrote the onboarding conversation to elicit grounded recent moments instead of abstract spark questions, captured verbatim user voice for the judge to read, added a visual-preference dimension, and wired the lifestyle basics into dealbreaker filtering with paired tolerance fields.
+
+- **Conversation rewrite (v4)** — `ESSENTIAL_DIMENSIONS` in `src/kandal/profiling/engine.py` swapped from `emotional_dynamics` / `partner_vibe` / `spark_aliveness` to `lived_places` / `recent_rabbit_hole` / `recent_giving`. Opening message rewritten to start with a low-stakes "spot you've been in the last week or two" prompt instead of asking what they're "into right now"
+- **Spark voice JSONB (v4.0)** — New `profiles.spark_voice` column (`supabase/migrations/00018_profile_spark_voice.sql`, mirrored on `test_profiles`) stores verbatim user-voice slices alongside the paraphrased structured fields: `taste_fingerprint_quote`, `current_obsession_quote`, `humor_example_quote`, `giving_quote`, `pull_quote`. Surfaces register/voice tells the LLM judge would otherwise lose to paraphrase
+- **Visual preference (v4.1)** — `preferences.visual_type` (classic / artsy / athletic / no_strong_type) + `preferences.visual_preference` freeform (`00019_preferences_visual.sql`). Captured via spark MCQ + extractor, fed to the judge as a soft factor. Future phase will tie `visual_type` to photo-based pre-filtering
+- **Dealbreaker wiring (v4.2)** — `preferences.partner_wants_kids` + `preferences.partner_substances_max` paired tolerance columns capture what the user accepts *from a partner* (not just their own state). `src/kandal/scoring/dealbreakers.py` extended to filter on these; `src/kandal/profiling/basics.py` collects them in the basics MCQ loop (`00020_dealbreaker_wiring.sql`)
+- **test_preferences parity** — Migration 00020 mirrors the lifestyle-basics columns from prod (added in 00010) onto `test_preferences`, plus the new paired tolerance fields, so the `synthetic_test` harness can exercise dealbreakers end-to-end. `Preferences` Pydantic model gains the load-side fields for parity
+- **Dropped fields** — Removed unused `partner_values` and `dimension_weights` from `Preferences`; `rescue.py` no longer references the dropped `partner_values` / `lifestyle` Traits paths
+- **New test coverage** — `tests/test_dealbreakers.py` (20 cases) covers the v4.2 paired-tolerance filter behavior; `tests/conftest.py` extended with fixtures for the new fields
+- **Terminal driver** — `src/kandal/scripts/onboard_test.py` runs the full v4 onboarding conversation in the terminal (freeform → confirm → spark MCQs → long-term MCQs → basics MCQs → finalize), writes to `test_profiles` / `test_preferences` by default, and prints the extracted traits + `spark_voice` JSONB at the end for inspection
+- **Test count** — 60 tests passing (was 47 in Phase 10; tests/test_dealbreakers.py adds 20, partial offset from older deletions)
+- **Deployment** — Single commit `7032bbe` pushed to `main`; migrations 00018–00020 applied to Supabase prior to push; Vercel auto-deployed from the push
+
 ## Current State
 
 | Component | Status |
@@ -170,4 +185,4 @@
 - **Database:** Supabase (PostgreSQL)
 - **SMS:** Twilio
 - **Hosting:** Vercel
-- **Testing:** pytest (85 tests)
+- **Testing:** pytest (60 tests)
