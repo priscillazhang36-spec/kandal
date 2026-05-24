@@ -39,7 +39,6 @@ class InferredTraits(BaseModel):
     birth_date: str | None = None          # ISO format "YYYY-MM-DD"
     birth_time_approx: str | None = None   # "HH:00-HH:00" 3hr window
     birth_city: str | None = None
-    dimension_weights: dict[str, float] | None = None  # personalized scoring priorities
     # Emotional dynamics — the core long-term matching signal
     emotional_giving: str | None = None    # how this person makes partners feel
     emotional_needs: str | None = None     # what they need to feel from a partner
@@ -50,18 +49,19 @@ class InferredTraits(BaseModel):
     contradiction_hook: str | None = None  # "I'm a [ ] who also [ ]"
     past_attraction: str | None = None     # what pulled them in last time — real not stated
     favorite_places: list[dict] | None = None  # [{"name","type","neighborhood","note"}]
+    spark_voice: dict | None = None        # verbatim user-voice slices per moment (v4)
+    visual_preference: str | None = None   # appearance preference freeform (v4.1)
     # Spark MCQ results — categorical first-date signals
-    humor_style: str | None = None
-    conversational_texture: str | None = None
+    humor_style: str | None = None         # deprecated v4: replaced by recent_laugh moment
+    conversational_texture: str | None = None  # deprecated v4: implicit in voice slices
     energy_pace: str | None = None
     ambition_shape: str | None = None
+    visual_type: str | None = None         # appearance preference categorical bucket (v4.1)
     # Tier 1 tag lists — extracted from conversation
     interests: list[str] | None = None
     personality: list[str] | None = None
     partner_personality: list[str] | None = None
     values: list[str] | None = None
-    partner_values: list[str] | None = None
-    lifestyle: list[str] | None = None
     # Lifestyle basics — dealbreaker-grade filters
     age_min: int | None = None
     age_max: int | None = None
@@ -75,6 +75,9 @@ class InferredTraits(BaseModel):
     drinks: str | None = None                     # never / socially / regularly
     smokes: str | None = None                     # never / socially / regularly
     cannabis: str | None = None                   # never / socially / regularly
+    # Paired tolerance (v4.2) — what the user accepts FROM A PARTNER
+    partner_wants_kids: str | None = None         # yes / no / open
+    partner_substances_max: str | None = None     # never / socially / regularly / open
 
 
 def _argmax_with_priority(counts: dict[str, int], priority: list[str]) -> str:

@@ -39,6 +39,57 @@ def _letter(text: str, valid: set[str]) -> str | None:
     return None
 
 
+def _parse_gender_self(text: str) -> str | None:
+    """Parse the user's own gender from A/B/C/D or free text."""
+    letter = _letter(text, {"A", "B", "C", "D"})
+    mapping = {"A": "male", "B": "female", "C": "nonbinary"}
+    if letter in mapping:
+        return mapping[letter]
+    if letter == "D":
+        # Free-text: classify by keyword
+        t = text.lower()
+        if "man" in t or "male" in t or "guy" in t:
+            return "male"
+        if "woman" in t or "female" in t:
+            return "female"
+        if "nonbinary" in t or "non-binary" in t or "enby" in t or "they/them" in t:
+            return "nonbinary"
+        return None
+    # Plain free-text without an MCQ letter
+    t = text.strip().lower()
+    if t in {"male", "man", "guy", "m"}:
+        return "male"
+    if t in {"female", "woman", "f"}:
+        return "female"
+    if t in {"nonbinary", "non-binary", "enby", "nb"}:
+        return "nonbinary"
+    return None
+
+
+def _parse_religion_self(text: str) -> str | None:
+    """Parse the user's own religion from A-I or free text."""
+    letter = _letter(text, {"A", "B", "C", "D", "E", "F", "G", "H", "I"})
+    mapping = {
+        "A": "christian",
+        "B": "catholic",
+        "C": "jewish",
+        "D": "muslim",
+        "E": "hindu",
+        "F": "buddhist",
+        "G": "spiritual",
+        "H": "none",
+    }
+    if letter in mapping:
+        return mapping[letter]
+    if letter == "I":
+        # Free-text after the letter — strip the prefix
+        cleaned = re.sub(r"^\s*i[\s,:.-]*", "", text.strip(), flags=re.I)
+        return cleaned.lower() or None
+    # Plain free-text without an MCQ letter
+    t = text.strip().lower()
+    return t or None
+
+
 def _parse_gender_pref(text: str) -> list[str] | None:
     letter = _letter(text, {"A", "B", "C", "D", "E"})
     mapping = {"A": ["male"], "B": ["female"], "C": ["nonbinary"], "D": ["male", "female", "nonbinary"]}
@@ -158,6 +209,16 @@ def _parse_religion(text: str) -> str | None:
     return mapping.get(letter)
 
 
+def _parse_partner_wants_kids(text: str) -> str | None:
+    letter = _letter(text, {"A", "B", "C"})
+    return {"A": "yes", "B": "no", "C": "open"}.get(letter)
+
+
+def _parse_partner_substances_max(text: str) -> str | None:
+    letter = _letter(text, {"A", "B", "C", "D"})
+    return {"A": "never", "B": "socially", "C": "regularly", "D": "open"}.get(letter)
+
+
 def _parse_substances(text: str) -> dict | None:
     """Accept free-form like 'drinks socially, never smokes, weed sometimes'.
 
@@ -217,10 +278,19 @@ def _build_age_prompt(traits: dict) -> str:
 
 QUESTIONS: list[BasicQuestion] = [
     BasicQuestion(
-        key="gender_preference",
+        key="gender",
         prompt=(
             "Alright, just a few quick logistics and we're done.\n\n"
-            "Who are you looking to date?\n\n"
+            "First — what's your gender?\n\n"
+            "A) Man\nB) Woman\nC) Non-binary\nD) Tell me in your own words"
+        ),
+        parse=_parse_gender_self,
+        skip_if_known=lambda t: bool(t.get("gender")),
+    ),
+    BasicQuestion(
+        key="gender_preference",
+        prompt=(
+            "And who are you looking to date?\n\n"
             "A) Men\nB) Women\nC) Non-binary folks\nD) Open to all\n"
             "E) Tell me in your own words"
         ),
@@ -232,21 +302,6 @@ QUESTIONS: list[BasicQuestion] = [
         prompt="What's your birthday? (Month/Day/Year — e.g. 11/28/1996)",
         parse=lambda s: _normalize_birth_date(s),
         skip_if_known=lambda t: bool(t.get("birth_date")),
-    ),
-    BasicQuestion(
-        key="birth_time_approx",
-        prompt=(
-            "Any idea what time of day you were born? (Rough is fine — morning, "
-            "afternoon, etc. Reply 'skip' if you don't know.)"
-        ),
-        parse=lambda s: None if s.strip().lower() in {"skip", "idk", "no", "unknown"} else _normalize_birth_time(s),
-        skip_if_known=lambda t: bool(t.get("birth_time_approx")),
-    ),
-    BasicQuestion(
-        key="birth_city",
-        prompt="Where were you born? (city is fine)",
-        parse=_parse_free_text,
-        skip_if_known=lambda t: bool(t.get("birth_city")),
     ),
     BasicQuestion(
         key="current_city",
@@ -319,9 +374,26 @@ QUESTIONS: list[BasicQuestion] = [
         skip_if_known=lambda t: bool(t.get("relationship_structure")),
     ),
     BasicQuestion(
+        key="religion",
+        prompt=(
+            "Religion or spiritual background?\n\n"
+            "A) Christian (Protestant)\n"
+            "B) Catholic\n"
+            "C) Jewish\n"
+            "D) Muslim\n"
+            "E) Hindu\n"
+            "F) Buddhist\n"
+            "G) Spiritual / agnostic\n"
+            "H) Atheist / none\n"
+            "I) Other (tell me in your own words)"
+        ),
+        parse=_parse_religion_self,
+        skip_if_known=lambda t: bool(t.get("religion")),
+    ),
+    BasicQuestion(
         key="religion_importance",
         prompt=(
-            "How important is religion or spirituality in a partner?\n\n"
+            "And how important is religion or spirituality in your life?\n\n"
             "A) Not important\nB) Somewhat\nC) Very important"
         ),
         parse=_parse_religion,
@@ -336,6 +408,29 @@ QUESTIONS: list[BasicQuestion] = [
         ),
         parse=_parse_substances,
         skip_if_known=lambda t: any(t.get(k) for k in ("drinks", "smokes", "cannabis")),
+    ),
+    BasicQuestion(
+        key="partner_wants_kids",
+        prompt=(
+            "And from a partner — kids, yes or no?\n\n"
+            "A) Should want kids (and not already have them as a non-starter)\n"
+            "B) Should NOT want kids (and ideally not already have them)\n"
+            "C) Open either way"
+        ),
+        parse=_parse_partner_wants_kids,
+        skip_if_known=lambda t: bool(t.get("partner_wants_kids")),
+    ),
+    BasicQuestion(
+        key="partner_substances_max",
+        prompt=(
+            "Most you'd be okay with from a partner on substances overall (drinks/smokes/weed)?\n\n"
+            "A) Never anything\n"
+            "B) Socially is fine\n"
+            "C) Regularly is fine\n"
+            "D) No strong preference"
+        ),
+        parse=_parse_partner_substances_max,
+        skip_if_known=lambda t: bool(t.get("partner_substances_max")),
     ),
 ]
 

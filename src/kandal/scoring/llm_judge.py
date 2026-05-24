@@ -99,17 +99,40 @@ def _format_person(label: str, profile: Profile, prefs: Preferences) -> str:
     if getattr(profile, "city", None):
         parts.append(f"City: {profile.city}")
 
+    # v4: surface verbatim user-voice slices alongside paraphrased fields.
+    # The quote is in the user's actual register/casing — it's the signal
+    # paraphrase strips out (aesthete vs grounded, lyrical vs clipped).
+    voice = getattr(profile, "spark_voice", None) or {}
+
+    def _voice_line(quote_key: str) -> str | None:
+        q = voice.get(quote_key) if isinstance(voice, dict) else None
+        if not q or not isinstance(q, str):
+            return None
+        return f'  voice: "{q.strip()}"'
+
     spark_lines = []
     if getattr(profile, "current_obsession", None):
         spark_lines.append(f"- current obsession: {profile.current_obsession}")
+        vl = _voice_line("current_obsession_quote")
+        if vl:
+            spark_lines.append(vl)
     if getattr(profile, "two_hour_topic", None):
         spark_lines.append(f"- could talk for two hours about: {profile.two_hour_topic}")
+        vl = _voice_line("forever_topic_quote")
+        if vl:
+            spark_lines.append(vl)
     if getattr(profile, "taste_fingerprint", None):
         spark_lines.append(f"- taste fingerprint: {profile.taste_fingerprint}")
+        vl = _voice_line("taste_fingerprint_quote")
+        if vl:
+            spark_lines.append(vl)
     if getattr(profile, "contradiction_hook", None):
         spark_lines.append(f"- contradiction: {profile.contradiction_hook}")
     if getattr(profile, "past_attraction", None):
         spark_lines.append(f"- past attraction pattern: {profile.past_attraction}")
+        vl = _voice_line("pull_quote")
+        if vl:
+            spark_lines.append(vl)
     if getattr(profile, "favorite_places", None):
         place_names = [
             str(p.get("name") or p.get("place") or p)
@@ -118,14 +141,26 @@ def _format_person(label: str, profile: Profile, prefs: Preferences) -> str:
         ]
         if place_names:
             spark_lines.append(f"- favorite places: {', '.join(place_names)}")
-    if getattr(prefs, "humor_style", None):
-        spark_lines.append(f"- humor: {prefs.humor_style}")
-    if getattr(prefs, "conversational_texture", None):
-        spark_lines.append(f"- conversational texture: {prefs.conversational_texture}")
+    # Verbatim humor + giving moments (no paraphrased equivalent — the quote
+    # IS the signal, not a label)
+    humor_q = voice.get("humor_example_quote") if isinstance(voice, dict) else None
+    if humor_q:
+        spark_lines.append(f'- last hard laugh (verbatim): "{humor_q.strip()}"')
+    giving_q = voice.get("giving_quote") if isinstance(voice, dict) else None
+    if giving_q:
+        spark_lines.append(f'- recent giving moment (verbatim): "{giving_q.strip()}"')
     if getattr(prefs, "energy_pace", None):
         spark_lines.append(f"- energy/pace: {prefs.energy_pace}")
     if getattr(prefs, "ambition_shape", None):
         spark_lines.append(f"- ambition shape: {prefs.ambition_shape}")
+    # v4.1: appearance preference (what they're visually pulled toward)
+    if getattr(prefs, "visual_type", None):
+        spark_lines.append(f"- visual type they're pulled to: {prefs.visual_type}")
+    if getattr(prefs, "visual_preference", None):
+        spark_lines.append(f"- visual preference: {prefs.visual_preference}")
+        vl = _voice_line("visual_pull_quote")
+        if vl:
+            spark_lines.append(vl)
     parts.append("\nSPARK SIGNALS (primary scoring inputs):")
     if spark_lines:
         parts.extend(spark_lines)

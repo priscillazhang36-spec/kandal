@@ -34,6 +34,7 @@ class Profile(BaseModel):
     contradiction_hook: str | None = None
     past_attraction: str | None = None
     favorite_places: list[dict] | None = None
+    spark_voice: dict | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

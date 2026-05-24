@@ -36,15 +36,16 @@ HARD_QUESTION_CAP = 22
 # Assess coverage every N turns to reduce LLM calls
 COVERAGE_CHECK_INTERVAL = 2
 
-# Spark pillars Kandal MUST gather real signal on before finalizing freeform.
+# Moment pillars Kandal MUST gather before finalizing freeform (v4).
 # The long-term categorical self-pillars (attachment / love languages / conflict
 # / history) come from the post-summary long-term MCQ loop — not gated here.
-# Taste and attraction are nice-to-have but not blocking (users who don't want
-# to share past attraction shouldn't be forced).
+# `recent_pull` and `recent_laugh` are nice-to-have but not blocking (users who
+# don't want to go into past attraction or can't surface a recent laugh
+# shouldn't be forced).
 ESSENTIAL_DIMENSIONS = [
-    "emotional_dynamics",   # how it feels to be loved by them + what they need
-    "partner_vibe",         # what kind of person they're looking for
-    "spark_aliveness",      # what's firing in them right now
+    "lived_places",         # opener pillar — grounded, low-stakes, gives taste + register
+    "recent_rabbit_hole",   # this week's hole — current obsession
+    "recent_giving",        # how they show up — emotional dynamics
 ]
 ESSENTIAL_THRESHOLD = 0.6
 
@@ -57,12 +58,11 @@ OPENING_MESSAGE = (
     "No profiles to write, no photos to agonize over. Just a conversation "
     "with me, and then I do the rest.\n\n"
     "For that to work though, I need to actually know you. We'll talk for "
-    "about 10-15 minutes — starts with what you're into and what's firing in "
-    "you right now, gets into the realer stuff later (how you love, what you "
-    "need from a partner). A sentence or two is plenty per answer.\n\n"
-    "Okay, diving in — what's something you're actually into right now? A "
-    "rabbit hole, a show you can't shut up about, a project, a place you keep "
-    "going back to, anything. Doesn't have to be deep."
+    "about 10-15 minutes — small specific things, recent stuff mostly. A "
+    "sentence or two is plenty per answer.\n\n"
+    "Okay, easy one to start — a spot you've actually been to in the last "
+    "week or two. Cafe, park, restaurant, bar, anywhere. What were you "
+    "doing there?"
 )
 
 def _parse_letter_abcd(text: str) -> int | None:

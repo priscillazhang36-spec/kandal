@@ -2,9 +2,12 @@
 on a first date. Runs as a deterministic loop after the freeform conversation,
 before the logistics basics loop.
 
-Four dimensions: humor, conversational texture, energy/pace, ambition shape.
-Each question maps a letter answer to a categorical value that lands on the
-preferences table.
+V4: trimmed from 4 dimensions to 2 — humor and conversational texture are now
+collected via the freeform `recent_laugh` moment + voice slices across all
+moments (richer than A/B/C/D for those signals). The remaining two MCQs cover
+categorical lifestyle dispositions that don't narrate cleanly:
+- energy/pace (how entangled/parallel)
+- ambition shape (5-year posture)
 """
 
 from __future__ import annotations
@@ -35,28 +38,6 @@ def _letter(text: str, valid: set[str]) -> str | None:
     return None
 
 
-def _parse_humor(text: str) -> str | None:
-    letter = _letter(text, {"A", "B", "C", "D"})
-    mapping = {
-        "A": "deadpan",
-        "B": "absurdist",
-        "C": "bits",
-        "D": "dark",
-    }
-    return mapping.get(letter)
-
-
-def _parse_conversational(text: str) -> str | None:
-    letter = _letter(text, {"A", "B", "C", "D"})
-    mapping = {
-        "A": "volley",
-        "B": "meander",
-        "C": "stories",
-        "D": "spacious",
-    }
-    return mapping.get(letter)
-
-
 def _parse_energy(text: str) -> str | None:
     letter = _letter(text, {"A", "B", "C", "D"})
     mapping = {
@@ -79,31 +60,18 @@ def _parse_ambition(text: str) -> str | None:
     return mapping.get(letter)
 
 
+def _parse_visual_type(text: str) -> str | None:
+    letter = _letter(text, {"A", "B", "C", "D"})
+    mapping = {
+        "A": "classic",          # put-together, polished
+        "B": "artsy",            # specific, expressive
+        "C": "athletic",         # outdoorsy, active build
+        "D": "no_strong_type",   # face/energy over body type
+    }
+    return mapping.get(letter)
+
+
 QUESTIONS: list[SparkQuestion] = [
-    SparkQuestion(
-        key="humor_style",
-        prompt=(
-            "Quick one — what makes you laugh hardest?\n\n"
-            "A) A perfectly timed silence after someone says something dumb\n"
-            "B) A story that spirals further and further off the rails\n"
-            "C) A committed bit — an impression or voice, never breaking\n"
-            "D) A dark joke you probably shouldn't laugh at but absolutely do"
-        ),
-        parse=_parse_humor,
-        skip_if_known=lambda t: bool(t.get("humor_style")),
-    ),
-    SparkQuestion(
-        key="conversational_texture",
-        prompt=(
-            "You're on a first date. You're most yourself when the conversation:\n\n"
-            "A) Volleys fast — teasing, riffing, one-upping each other\n"
-            "B) Winds somewhere unexpected — small talk into debating free will\n"
-            "C) Leans into stories — they tell you theirs, you tell them yours\n"
-            "D) Has long comfortable pauses and you're both fine with them"
-        ),
-        parse=_parse_conversational,
-        skip_if_known=lambda t: bool(t.get("conversational_texture")),
-    ),
     SparkQuestion(
         key="energy_pace",
         prompt=(
@@ -127,6 +95,18 @@ QUESTIONS: list[SparkQuestion] = [
         ),
         parse=_parse_ambition,
         skip_if_known=lambda t: bool(t.get("ambition_shape")),
+    ),
+    SparkQuestion(
+        key="visual_type",
+        prompt=(
+            "Last one — which best matches the look that pulls you in?\n\n"
+            "A) Classic / put-together — well-dressed, polished, takes care of themselves\n"
+            "B) Artsy / specific — has a distinctive style, expressive, a little weird\n"
+            "C) Athletic / outdoorsy — active build, comfortable in their body, sun on them\n"
+            "D) No strong type — it's mostly about the face or the energy, not the body"
+        ),
+        parse=_parse_visual_type,
+        skip_if_known=lambda t: bool(t.get("visual_type")),
     ),
 ]
 

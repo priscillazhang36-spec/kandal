@@ -33,6 +33,18 @@ def make_user():
         love_language_receiving=None,
         conflict_style=None,
         relationship_history=None,
+        # v4.2 lifestyle basics + paired tolerance (now read by dealbreakers)
+        relationship_intent=None,
+        has_kids=None,
+        wants_kids=None,
+        relationship_structure=None,
+        religion=None,
+        religion_importance=None,
+        drinks=None,
+        smokes=None,
+        cannabis=None,
+        partner_wants_kids=None,
+        partner_substances_max=None,
     ):
         pid = uuid4()
         profile = Profile(
@@ -63,6 +75,17 @@ def make_user():
             love_language_receiving=love_language_receiving or [],
             conflict_style=conflict_style,
             relationship_history=relationship_history,
+            relationship_intent=relationship_intent,
+            has_kids=has_kids,
+            wants_kids=wants_kids,
+            relationship_structure=relationship_structure,
+            religion=religion,
+            religion_importance=religion_importance,
+            drinks=drinks,
+            smokes=smokes,
+            cannabis=cannabis,
+            partner_wants_kids=partner_wants_kids,
+            partner_substances_max=partner_substances_max,
         )
         return profile, prefs
 

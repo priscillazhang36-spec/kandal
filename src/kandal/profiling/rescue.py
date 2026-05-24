@@ -72,10 +72,6 @@ def rescue_stale_conversations() -> dict:
                 prefs_data["partner_personality"] = traits.partner_personality
             if traits.values:
                 prefs_data["values"] = traits.values
-            if traits.partner_values:
-                prefs_data["partner_values"] = traits.partner_values
-            if traits.lifestyle:
-                prefs_data["lifestyle"] = traits.lifestyle
             for field in (
                 "age_min", "age_max", "max_distance_km", "relationship_intent",
                 "has_kids", "wants_kids", "relationship_structure",

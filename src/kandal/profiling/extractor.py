@@ -323,10 +323,6 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]
     birth_time_approx = _normalize_birth_time(data.get("birth_time_approx"))
     birth_city = data.get("birth_city")
 
-    # dimension_weights: no longer extracted from conversation (ranking question
-    # removed). Kept as null on the model; the LLM judge reads raw signals.
-    dimension_weights = None
-
     # Emotional dynamics — the core matching signal
     emotional_giving = data.get("emotional_giving")
     if not isinstance(emotional_giving, str) or len(emotional_giving.strip()) < 10:
@@ -348,6 +344,39 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]
     two_hour_topic = _spark_text("two_hour_topic")
     contradiction_hook = _spark_text("contradiction_hook")
     past_attraction = _spark_text("past_attraction")
+    visual_preference = _spark_text("visual_preference")
+
+    # Verbatim voice slices (v4). Each *_quote is a 20-50 word direct slice
+    # from the user's actual messages — kept unparaphrased so the LLM judge
+    # sees register/voice tells that paraphrase strips out.
+    def _quote(key: str, min_len: int = 8) -> str | None:
+        v = data.get(key)
+        if not isinstance(v, str):
+            return None
+        v = v.strip()
+        if len(v) < min_len:
+            return None
+        # Cap at ~80 words to keep judge payload bounded; the prompt asks
+        # for 20-50 but we tolerate slightly longer slices.
+        words = v.split()
+        if len(words) > 80:
+            v = " ".join(words[:80])
+        return v
+
+    spark_voice: dict[str, str] = {}
+    for quote_key in (
+        "taste_fingerprint_quote",
+        "current_obsession_quote",
+        "forever_topic_quote",
+        "humor_example_quote",
+        "giving_quote",
+        "pull_quote",
+        "visual_pull_quote",
+    ):
+        q = _quote(quote_key)
+        if q:
+            spark_voice[quote_key] = q
+    spark_voice = spark_voice or None  # store None when nothing was captured
 
     # favorite_places: list of dicts with name/type/(neighborhood)/(note)
     raw_places = data.get("favorite_places")
@@ -397,20 +426,6 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]
         values = [str(t).lower().strip() for t in values if isinstance(t, str)]
         values = values or None
 
-    partner_values = data.get("partner_values")
-    if not isinstance(partner_values, list):
-        partner_values = None
-    else:
-        partner_values = [str(t).lower().strip() for t in partner_values if isinstance(t, str)]
-        partner_values = partner_values or None
-
-    lifestyle = data.get("lifestyle")
-    if not isinstance(lifestyle, list):
-        lifestyle = None
-    else:
-        lifestyle = [str(t).lower().strip() for t in lifestyle if isinstance(t, str)]
-        lifestyle = lifestyle or None
-
     def _enum(key: str, allowed: set[str]) -> str | None:
         v = data.get(key)
         return v if isinstance(v, str) and v in allowed else None
@@ -449,7 +464,6 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]
         birth_date=birth_date,
         birth_time_approx=birth_time_approx,
         birth_city=birth_city,
-        dimension_weights=dimension_weights,
         emotional_giving=emotional_giving,
         emotional_needs=emotional_needs,
         taste_fingerprint=taste_fingerprint,
@@ -458,12 +472,12 @@ def extract_traits(messages: list[dict]) -> tuple[InferredTraits, str, set[str]]
         contradiction_hook=contradiction_hook,
         past_attraction=past_attraction,
         favorite_places=favorite_places,
+        visual_preference=visual_preference,
+        spark_voice=spark_voice,
         interests=interests,
         personality=personality,
         partner_personality=partner_personality,
         values=values,
-        partner_values=partner_values,
-        lifestyle=lifestyle,
         age_min=age_min,
         age_max=age_max,
         max_distance_km=max_distance_km,

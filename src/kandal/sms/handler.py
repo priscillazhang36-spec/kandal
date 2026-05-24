@@ -117,10 +117,11 @@ def _finalize(session: OnboardingSession) -> bool:
         profile_update["emotional_giving"] = traits.emotional_giving
     if traits.emotional_needs:
         profile_update["emotional_needs"] = traits.emotional_needs
-    # Spark signals — freeform text + structured places
+    # Spark signals — freeform text + structured places + verbatim voice (v4)
     for field in (
         "taste_fingerprint", "current_obsession", "two_hour_topic",
         "contradiction_hook", "past_attraction", "favorite_places",
+        "spark_voice",
     ):
         val = getattr(traits, field, None)
         if val:
@@ -150,8 +151,6 @@ def _finalize(session: OnboardingSession) -> bool:
         prefs_data["gender_preferences"] = gender_pref
     if traits.cultural_preferences:
         prefs_data["cultural_preferences"] = traits.cultural_preferences
-    if traits.dimension_weights:
-        prefs_data["dimension_weights"] = traits.dimension_weights
     if traits.interests:
         prefs_data["interests"] = traits.interests
     if traits.personality:
@@ -160,16 +159,18 @@ def _finalize(session: OnboardingSession) -> bool:
         prefs_data["partner_personality"] = traits.partner_personality
     if traits.values:
         prefs_data["values"] = traits.values
-    if traits.partner_values:
-        prefs_data["partner_values"] = traits.partner_values
-    if traits.lifestyle:
-        prefs_data["lifestyle"] = traits.lifestyle
     for field in (
         "age_min", "age_max", "max_distance_km", "relationship_intent",
         "has_kids", "wants_kids", "relationship_structure",
         "religion", "religion_importance", "drinks", "smokes", "cannabis",
-        # Spark MCQ categoricals
-        "humor_style", "conversational_texture", "energy_pace", "ambition_shape",
+        # Spark MCQ categoricals (v4: humor_style + conversational_texture
+        # are no longer collected — replaced by recent_laugh moment + voice
+        # slices. Existing DB columns preserved for backwards-compat reads.)
+        "energy_pace", "ambition_shape",
+        # v4.1: appearance preference
+        "visual_preference", "visual_type",
+        # v4.2: paired tolerance for dealbreakers
+        "partner_wants_kids", "partner_substances_max",
     ):
         val = getattr(traits, field, None)
         if val is not None:
