@@ -17,6 +17,7 @@ router = APIRouter()
 
 class ChatStartRequest(BaseModel):
     phone: str  # E.164 format, e.g. "+15551234567"
+    mode: str = "ideal_type_discovery"  # or "full_discovery"
 
 
 class ChatStartResponse(BaseModel):
@@ -74,7 +75,13 @@ def kandal_chat(body: KandalChatRequest):
 
 @router.post("/chat/start", response_model=ChatStartResponse)
 def chat_start(body: ChatStartRequest):
-    """Start a web chat profiling session. Returns opening message."""
+    """Start a web chat profiling session. Returns opening message.
+
+    Mode controls which engine drives the session:
+      - "full_discovery": user-centric profile elicitation, becomes matchable.
+      - "ideal_type_discovery" (default): partner-clarity exercise, does NOT
+        flip is_active or write a preferences row.
+    """
     client = get_supabase()
     phone = body.phone
 
@@ -88,7 +95,39 @@ def chat_start(body: ChatStartRequest):
         ).execute()
         profile_id = resp.data[0]["id"]
 
-    # Start adaptive profiling
+    if body.mode == "ideal_type_discovery":
+        from kandal.profiling.ideal_type_engine import IdealTypeEngine
+
+        engine = IdealTypeEngine()
+        state, opening = engine.start(UUID(str(profile_id)))
+
+        row_resp = client.table("ideal_types").insert({
+            "profile_id": str(profile_id),
+            "messages": state.messages,
+            "stage": state.stage,
+            "sub_state": _serialize_ideal_sub_state(state),
+        }).execute()
+
+        session_resp = client.table("onboarding_sessions").upsert(
+            {
+                "phone": phone,
+                "state": "ideal_type_discovery",
+                "mode": "ideal_type_discovery",
+                "verification_code": None,
+                "code_expires_at": None,
+                "code_attempts": 0,
+                "profile_id": str(profile_id),
+                "answers": [],
+                "collected_basics": {},
+                "conversation_id": row_resp.data[0]["id"],
+            },
+            on_conflict="phone",
+        ).execute()
+
+        session_id = session_resp.data[0]["id"]
+        return ChatStartResponse(session_id=str(session_id), message=opening)
+
+    # Default branch: full_discovery (existing behavior)
     engine = ProfilingEngine()
     state, opening = engine.start(UUID(str(profile_id)))
 
@@ -103,6 +142,7 @@ def chat_start(body: ChatStartRequest):
         {
             "phone": phone,
             "state": "adaptive_profiling",
+            "mode": "full_discovery",
             "verification_code": None,
             "code_expires_at": None,
             "code_attempts": 0,
@@ -116,6 +156,21 @@ def chat_start(body: ChatStartRequest):
 
     session_id = session_resp.data[0]["id"]
     return ChatStartResponse(session_id=str(session_id), message=opening)
+
+
+def _serialize_ideal_sub_state(state) -> dict:
+    """Pack ideal-type engine state fields that aren't already top-level columns."""
+    return {
+        "dealbreaker_index": state.dealbreaker_index,
+        "dealbreaker_answers": state.dealbreaker_answers,
+        "celebrity_pairs": state.celebrity_pairs,
+        "celebrity_pair_index": state.celebrity_pair_index,
+        "questions_asked": state.questions_asked,
+        "last_coverage_check_turn": state.last_coverage_check_turn,
+        "vignette_index": state.vignette_index,
+        "vignette_replies": state.vignette_replies,
+        "pending_artifact": state.pending_artifact,
+    }
 
 
 @router.post("/chat/reply", response_model=ChatReplyResponse)
@@ -169,7 +224,9 @@ def _route_without_sms(phone: str, body: str) -> str:
 
     state = session.state
 
-    if state == "adaptive_profiling":
+    if state == "ideal_type_discovery":
+        reply = _handle_ideal_type(session, body)
+    elif state == "adaptive_profiling":
         reply = _handle_adaptive_profiling(session, body)
     elif state.startswith("onboarding_q"):
         q_index = int(state.replace("onboarding_q", "")) - 1
@@ -201,6 +258,10 @@ def _route_without_sms(phone: str, body: str) -> str:
         except Exception as e:
             logger.error("kandal chat_turn failed for %s: %s", phone, e)
             reply = messages.ALREADY_COMPLETE
+    elif state == "ideal_type_complete":
+        reply = (
+            "Your ideal-type session is locked in. Come back anytime to refine it."
+        )
     elif state == "expired":
         reply = messages.SESSION_EXPIRED
     else:
@@ -208,3 +269,98 @@ def _route_without_sms(phone: str, body: str) -> str:
 
     logger.info("web_chat phone=%s state=%s body=%r reply=%r", phone, state, body, reply[:80])
     return reply
+
+
+def _handle_ideal_type(session, body: str) -> str:
+    """Drive one turn of the ideal_type_discovery flow. Persists state changes."""
+    from datetime import datetime, timezone
+    from kandal.profiling.ideal_type_engine import (
+        IdealTypeEngine,
+        IdealTypeState,
+    )
+    from kandal.sms.handler import _save_session
+
+    client = get_supabase()
+    row_resp = client.table("ideal_types").select("*").eq(
+        "id", str(session.conversation_id)
+    ).execute()
+    if not row_resp.data:
+        logger.error("ideal_types row missing for session %s", session.id)
+        return "Session lost — please start again."
+
+    row = row_resp.data[0]
+    sub = row.get("sub_state") or {}
+
+    state = IdealTypeState(
+        profile_id=UUID(str(session.profile_id)),
+        messages=row.get("messages") or [],
+        stage=row.get("stage") or "dealbreakers",
+        dealbreaker_index=sub.get("dealbreaker_index", 0),
+        dealbreaker_answers=sub.get("dealbreaker_answers") or {},
+        celebrity_pairs=sub.get("celebrity_pairs") or [],
+        celebrity_pair_index=sub.get("celebrity_pair_index", 0),
+        celebrity_choices=row.get("celebrity_choices") or [],
+        questions_asked=sub.get("questions_asked", 0),
+        last_coverage_check_turn=sub.get("last_coverage_check_turn", -1),
+        vignettes=row.get("vignettes") or [],
+        vignette_index=sub.get("vignette_index", 0),
+        vignette_replies=sub.get("vignette_replies") or [],
+        pending_artifact=sub.get("pending_artifact"),
+    )
+
+    engine = IdealTypeEngine()
+    turn = engine.next_turn(state, body)
+
+    update_data = {
+        "messages": state.messages,
+        "stage": state.stage,
+        "vignettes": state.vignettes,
+        "celebrity_choices": state.celebrity_choices,
+        "sub_state": {
+            "dealbreaker_index": state.dealbreaker_index,
+            "dealbreaker_answers": state.dealbreaker_answers,
+            "celebrity_pairs": state.celebrity_pairs,
+            "celebrity_pair_index": state.celebrity_pair_index,
+            "questions_asked": state.questions_asked,
+            "last_coverage_check_turn": state.last_coverage_check_turn,
+            "vignette_index": state.vignette_index,
+            "vignette_replies": state.vignette_replies,
+            "pending_artifact": state.pending_artifact,
+        },
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Persist dealbreaker answers to top-level columns as soon as we have them
+    # (so they're queryable / editable independently of the JSONB sub_state).
+    answers = state.dealbreaker_answers
+    for col in (
+        "gender_preference", "ethnicity_preference", "religion_preference",
+        "relationship_intent", "partner_wants_kids", "partner_smokes_max",
+        "partner_drinks_max", "partner_cannabis_max", "visual_importance",
+    ):
+        if col in answers:
+            update_data[col] = answers[col]
+    if "age_min" in answers:
+        update_data["age_min"] = answers["age_min"]
+    if "age_max" in answers:
+        update_data["age_max"] = answers["age_max"]
+
+    if turn.is_complete and turn.artifact:
+        artifact = turn.artifact
+        update_data["pull_pattern"] = artifact.get("pull_pattern")
+        update_data["break_pattern"] = artifact.get("break_pattern")
+        update_data["pull_pattern_quote"] = artifact.get("pull_pattern_quote")
+        update_data["partner_traits"] = artifact.get("partner_traits") or []
+        update_data["past_pulls"] = artifact.get("past_pulls") or []
+        update_data["icks"] = artifact.get("icks") or []
+        update_data["vignette_choices"] = artifact.get("vignette_choices") or []
+
+    client.table("ideal_types").update(update_data).eq(
+        "id", str(session.conversation_id)
+    ).execute()
+
+    if turn.is_complete:
+        session.state = "ideal_type_complete"
+        _save_session(session)
+
+    return turn.reply

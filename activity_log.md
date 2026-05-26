@@ -162,6 +162,21 @@
 - **Test count** — 60 tests passing (was 47 in Phase 10; tests/test_dealbreakers.py adds 20, partial offset from older deletions)
 - **Deployment** — Single commit `7032bbe` pushed to `main`; migrations 00018–00020 applied to Supabase prior to push; Vercel auto-deployed from the push
 
+## Phase 14: Ideal-Type Discovery Mode
+
+**What:** Added a second onboarding flow `ideal_type_discovery` alongside the existing `full_discovery`. Designed for users who don't know what they want — uses revealed preference (past-pull excavation + LLM-generated forced-choice vignettes) instead of stated preference. <10-min target. Standalone alternative — does NOT make the user matchable; writes a separate ideal-type artifact only. `ideal_type_discovery` is now the default mode; `full_discovery` is opt-in.
+
+- **5-stage flow** — Stage 0: ~9 partner-facing dealbreaker MCQs (gender, age range, ethnicity, religion, smoking/drinking/cannabis tolerance, kids, intent). Stage 1: past-pull excavation (recent + earlier contrasting attraction). Stage 2: the "ick" beat. Stage 3: LLM-generated vignette forced-choice (2-3 contrast pairs tuned to past pulls + respecting dealbreakers). Stage 4: one-shot pattern readback + yes/correction. Soft cap 6 freeform turns, hard cap 14.
+- **Schema** — `supabase/migrations/00021_onboarding_mode.sql` adds `onboarding_sessions.mode` (default `ideal_type_discovery`); `00022_ideal_types.sql` creates the `ideal_types` table with structured dealbreaker columns, raw past_pulls/icks/vignettes/vignette_choices JSONB, and the synthesized artifact (pull_pattern + pull_pattern_quote + partner_traits)
+- **New engine** — `src/kandal/profiling/ideal_type_engine.py` — separate `IdealTypeEngine` class (not a parametrized ProfilingEngine — too divergent in shape). `IdealTypeState` carries stage + dealbreaker_index + vignettes + pending_artifact
+- **Vignette generator** — `src/kandal/profiling/ideal_type_vignettes.py` — single LLM call (`claude-sonnet-4-6`) takes past_pulls + icks + dealbreakers and returns 2-3 contrast pairs with named specifics. Hard guardrail: must respect demographic dealbreakers (gender, age, religion, substances, kids); both vignettes must be plausible — the choice should feel hard
+- **Extractor + readback** — `src/kandal/profiling/ideal_type_extractor.py` synthesizes the artifact (paraphrased + verbatim quotes for every past pull and tipped reason). `ideal_type_prompts.py` includes phase-gated conversation prompt, lightweight binary coverage check, extraction prompt, and one-shot readback prompt
+- **Dealbreaker MCQs** — `src/kandal/profiling/ideal_type_dealbreakers.py` — 9 partner-facing questions reusing the `_letter` parser pattern from `basics.py`. Skip-if-known for resumability
+- **Route wiring** — `src/kandal/api/routes/chat.py:ChatStartRequest.mode` defaults to `ideal_type_discovery`; `chat_start` branches by mode and inserts to the right table. `_handle_ideal_type` helper loads state from the `ideal_types` row, drives one turn, persists messages + stage + sub_state, and on completion sets session `state="ideal_type_complete"`. SMS path (`auth.py`) explicitly sets `mode="full_discovery"` on session upsert since SMS doesn't have a mode picker
+- **Models** — `IdealType`, `PastPull`, `VignetteChoice`, `VignettePair` Pydantic models in `src/kandal/models/ideal_type.py`. `OnboardingSession.mode` added
+- **Tests** — `tests/test_ideal_type_engine.py` covers 10 state transitions with mocked Anthropic client (dealbreaker loop, freeform advancement, hard cap exit, coverage-check exit, vignette loop, readback yes/correction). Suite now 70 tests, all passing
+- **CLI driver** — `test_ideal_type_live.py` walks the full flow against real Claude + Supabase and reports elapsed time
+
 ## Current State
 
 | Component | Status |
@@ -170,7 +185,7 @@
 | Profile + trait creation | Working end-to-end |
 | Scoring engine (11 dimensions) | Complete — semantic similarity, cross-comparison, Bazi |
 | Bazi (Four Pillars) matching | Complete — pure function, graceful degradation |
-| Profiling conversation | Spark-first — freeform → summary → spark MCQs → long-term MCQs → basics |
+| Profiling conversation | Two modes — `ideal_type_discovery` (default, partner-clarity, <10min) and `full_discovery` (opt-in, full profile, ~20min) |
 | Batch matching | Runs daily + on-demand via API |
 | Vercel deployment | Live with auto-deploy |
 | Landing page | Live at kandal.app |
@@ -185,4 +200,4 @@
 - **Database:** Supabase (PostgreSQL)
 - **SMS:** Twilio
 - **Hosting:** Vercel
-- **Testing:** pytest (60 tests)
+- **Testing:** pytest (70 tests)

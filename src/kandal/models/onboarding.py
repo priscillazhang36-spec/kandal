@@ -15,5 +15,6 @@ class OnboardingSession(BaseModel):
     answers: list[int] = []
     collected_basics: dict = {}
     conversation_id: UUID | None = None
+    mode: str = "ideal_type_discovery"
     created_at: datetime | None = None
     updated_at: datetime | None = None

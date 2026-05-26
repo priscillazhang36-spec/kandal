@@ -61,6 +61,7 @@ def start_phone_auth(body: PhoneAuthRequest):
             {
                 "phone": body.phone,
                 "state": "adaptive_profiling",
+                "mode": "full_discovery",
                 "verification_code": None,
                 "code_expires_at": None,
                 "code_attempts": 0,
@@ -81,6 +82,7 @@ def start_phone_auth(body: PhoneAuthRequest):
             {
                 "phone": body.phone,
                 "state": "onboarding_q1",
+                "mode": "full_discovery",
                 "verification_code": None,
                 "code_expires_at": None,
                 "code_attempts": 0,
