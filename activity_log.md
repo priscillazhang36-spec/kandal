@@ -186,6 +186,12 @@
 - **Celebrity intro de-anchored** — changed "Now a quick visual read" → "Quick visual read first" so the celebrity stage reads naturally whether it's the first thing the user sees (skip path) or follows dealbreakers (when flag is flipped back).
 - **Downstream caveats (not patched)** — celebrity + vignette generators get empty `dealbreaker_answers`, so pairs are unfiltered (mixed-gender / no religion/substance/kids filters). Matching pipeline's Stage 1 dealbreaker filter has no constraints for users onboarded this way. `tests/test_ideal_type_engine.py` will fail at `start()` until updated.
 
+## Phase 17: Default Gender Preference on Skip Path
+
+**What:** With Stage 0 dealbreakers skipped, `dealbreaker_answers` was empty, making the celebrity + vignette generators produce mixed-gender content. Hard-default `gender_preference = ["male"]` when `SKIP_DEALBREAKERS=True` so both generators target a single gender until we have a real source of truth.
+
+- One-line edit in `IdealTypeEngine.start()` (skip branch) seeds `state.dealbreaker_answers["gender_preference"] = ["male"]` before calling `_start_celebrity_picks`. Flows through naturally to the vignette generator later (it reads from the same dict).
+
 ## Phase 16: Animated Typing Indicator
 
 **What:** Upgrade the web chat's typing indicator so long LLM calls (especially the freeform→vignette transition, which fires two back-to-back model calls) feel deliberate instead of frozen.

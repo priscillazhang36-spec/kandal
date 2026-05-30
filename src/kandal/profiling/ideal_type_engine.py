@@ -120,6 +120,11 @@ class IdealTypeEngine:
         state = IdealTypeState(profile_id=profile_id, stage="dealbreakers")
 
         if SKIP_DEALBREAKERS:
+            # Skipping the MCQ loop leaves dealbreaker_answers empty, which
+            # would make the celebrity + vignette generators produce
+            # mixed-gender content. Hard-default to male-attracted until we
+            # have a real source of truth for gender preference.
+            state.dealbreaker_answers["gender_preference"] = ["male"]
             intro = (
                 "Hey — I'm Kandal :)\n\n"
                 "Different mode than the full thing. We're not building a "
