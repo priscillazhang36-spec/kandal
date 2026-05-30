@@ -47,6 +47,9 @@ IDEAL_TYPE_HARD_CAP = 12          # hard cap on freeform turns
 COVERAGE_CHECK_MIN_TURN = 5       # first turn at which coverage can be checked
 COVERAGE_CHECK_EVERY = 2          # re-fire cadence after the first check
 
+# Temporarily skip Stage 0 dealbreaker MCQs. Flip to False to re-enable.
+SKIP_DEALBREAKERS = True
+
 
 _CONFIRM_YES = frozenset({
     "yes", "yeah", "yep", "y", "looks good", "correct", "confirmed",
@@ -110,9 +113,32 @@ class IdealTypeEngine:
     def start(self, profile_id: UUID) -> tuple[IdealTypeState, str]:
         """Begin a new ideal-type session. Returns (state, opening_message).
 
-        The opening message is the mode intro + the first dealbreaker question.
+        Normally the opening is the mode intro + the first dealbreaker question.
+        When SKIP_DEALBREAKERS is True, Stage 0 is bypassed and we jump
+        straight into Stage 0.5 (celebrity forced-choice).
         """
         state = IdealTypeState(profile_id=profile_id, stage="dealbreakers")
+
+        if SKIP_DEALBREAKERS:
+            intro = (
+                "Hey — I'm Kandal :)\n\n"
+                "Different mode than the full thing. We're not building a "
+                "dating profile here — we're figuring out what you actually "
+                "want. Most people don't really know, or they know in "
+                "checklist form ('smart, funny, ambitious') that doesn't "
+                "actually predict who pulls them. We'll find your real "
+                "pattern.\n\n"
+                "Two parts: first a few quick visual picks, then we'll "
+                "talk through a past relationship that mattered. About 15 "
+                "minutes total — quick reactions are better than analysis."
+            )
+            turn = self._start_celebrity_picks(state)
+            opening = f"{intro}\n\n{turn.reply}"
+            # _start_celebrity_picks already appended its reply — rewrite
+            # that last message so the transcript reflects the combined opening.
+            state.messages[-1]["content"] = opening
+            return state, opening
+
         first_q, idx = db_mcqs.next_question(state.dealbreaker_answers, 0)
         state.dealbreaker_index = idx
         opening = f"{OPENING_MESSAGE}\n\n{first_q.prompt}"
@@ -188,7 +214,7 @@ class IdealTypeEngine:
         state.stage = "celebrity_picks"
 
         intro = (
-            "Now a quick visual read — I'll show you some pairs of well-known "
+            "Quick visual read first — I'll show you a few pairs of well-known "
             "people. Pick whichever pulls you more, and tell me what tipped "
             "it. Quick reactions, no overthinking.\n\n"
             + format_celebrity_pair(pairs[0], 0, len(pairs))

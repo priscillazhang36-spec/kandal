@@ -177,6 +177,15 @@
 - **Tests** — `tests/test_ideal_type_engine.py` covers 10 state transitions with mocked Anthropic client (dealbreaker loop, freeform advancement, hard cap exit, coverage-check exit, vignette loop, readback yes/correction). Suite now 70 tests, all passing
 - **CLI driver** — `test_ideal_type_live.py` walks the full flow against real Claude + Supabase and reports elapsed time
 
+## Phase 15: Skip Stage 0 Dealbreakers (temporary)
+
+**What:** Temporarily bypass the Stage 0 dealbreaker MCQs in `ideal_type_discovery` mode and reshape the opening so users land directly in the celebrity forced-choice with proper context.
+
+- **Skip flag** — `SKIP_DEALBREAKERS = True` in `ideal_type_engine.py`. When set, `IdealTypeEngine.start()` jumps straight to `_start_celebrity_picks` with empty `dealbreaker_answers`. Flip to `False` to restore the full 10-question MCQ loop.
+- **Reworded opening** — replaces the old `OPENING_MESSAGE` (which advertised "~7 quick picks") with a two-part roadmap: warm intro → "Two parts: first a few quick visual picks, then we'll talk through a past relationship that mattered. About 15 minutes total."
+- **Celebrity intro de-anchored** — changed "Now a quick visual read" → "Quick visual read first" so the celebrity stage reads naturally whether it's the first thing the user sees (skip path) or follows dealbreakers (when flag is flipped back).
+- **Downstream caveats (not patched)** — celebrity + vignette generators get empty `dealbreaker_answers`, so pairs are unfiltered (mixed-gender / no religion/substance/kids filters). Matching pipeline's Stage 1 dealbreaker filter has no constraints for users onboarded this way. `tests/test_ideal_type_engine.py` will fail at `start()` until updated.
+
 ## Current State
 
 | Component | Status |
