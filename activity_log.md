@@ -186,6 +186,14 @@
 - **Celebrity intro de-anchored** — changed "Now a quick visual read" → "Quick visual read first" so the celebrity stage reads naturally whether it's the first thing the user sees (skip path) or follows dealbreakers (when flag is flipped back).
 - **Downstream caveats (not patched)** — celebrity + vignette generators get empty `dealbreaker_answers`, so pairs are unfiltered (mixed-gender / no religion/substance/kids filters). Matching pipeline's Stage 1 dealbreaker filter has no constraints for users onboarded this way. `tests/test_ideal_type_engine.py` will fail at `start()` until updated.
 
+## Phase 16: Animated Typing Indicator
+
+**What:** Upgrade the web chat's typing indicator so long LLM calls (especially the freeform→vignette transition, which fires two back-to-back model calls) feel deliberate instead of frozen.
+
+- **Animated dots** — `src/kandal/api/landing.py` now renders 3 cream-colored dots (7px, 75% opacity) inside the typing bubble, pulsing with a staggered keyframe animation (`@keyframes typing-pulse`, 1.3s loop, 180ms stagger, 3px bob). Bubble background bumped from `rgba(245,234,214,0.05)` → `0.08` for visibility against the `#0f0c15` background.
+- **After-5s escalation** — `showTyping()` schedules a timer that swaps the dots for "still thinking — putting something together for you..." with a 0.45s fade-in (`@keyframes typing-text-in`). Keeps the italic + soft cream tone so it reads as a system whisper.
+- **Cleanup** — `removeTyping()` clears the pending escalation timer so fast replies never trigger the swap.
+
 ## Current State
 
 | Component | Status |

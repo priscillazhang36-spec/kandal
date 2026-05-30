@@ -191,10 +191,44 @@ LANDING_HTML = r'''<!DOCTYPE html>
     }
     .msg.typing {
       align-self: flex-start;
-      background: rgba(245,234,214,0.05);
+      background: rgba(245,234,214,0.08);
       border-bottom-left-radius: 4px;
-      color: rgba(245,234,214,0.4);
+      color: rgba(245,234,214,0.55);
       font-style: italic;
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.4rem;
+      padding: 0.7rem 1rem;
+    }
+
+    .typing-dots {
+      display: inline-flex;
+      gap: 0.35rem;
+      align-items: center;
+      padding: 0.1rem 0;
+    }
+
+    .typing-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: rgba(245,234,214,0.75);
+      animation: typing-pulse 1.3s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.18s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+    @keyframes typing-pulse {
+      0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+      40%           { opacity: 1;   transform: translateY(-3px); }
+    }
+
+    .typing-text {
+      opacity: 0;
+      animation: typing-text-in 0.45s ease forwards;
+    }
+    @keyframes typing-text-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
     }
 
     .chat-input-area {
@@ -330,11 +364,38 @@ LANDING_HTML = r'''<!DOCTYPE html>
     }
 
     function showTyping() {
-      return addMessage('...', 'typing');
+      const bubble = document.createElement('div');
+      bubble.className = 'msg typing';
+
+      const dots = document.createElement('span');
+      dots.className = 'typing-dots';
+      dots.innerHTML =
+        '<span class="typing-dot"></span>' +
+        '<span class="typing-dot"></span>' +
+        '<span class="typing-dot"></span>';
+      bubble.appendChild(dots);
+
+      chatMessages.appendChild(bubble);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      // After ~5s, swap dots for a soft "still thinking" line so long
+      // waits (vignette generation) don't feel stuck.
+      bubble._escalateTimer = setTimeout(() => {
+        const text = document.createElement('span');
+        text.className = 'typing-text';
+        text.textContent = 'still thinking — putting something together for you...';
+        bubble.innerHTML = '';
+        bubble.appendChild(text);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }, 5000);
+
+      return bubble;
     }
 
     function removeTyping(el) {
-      if (el && el.parentNode) el.parentNode.removeChild(el);
+      if (!el) return;
+      if (el._escalateTimer) clearTimeout(el._escalateTimer);
+      if (el.parentNode) el.parentNode.removeChild(el);
     }
 
     function setWaiting(val) {
