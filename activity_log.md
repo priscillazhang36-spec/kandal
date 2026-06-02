@@ -186,6 +186,15 @@
 - **Celebrity intro de-anchored** — changed "Now a quick visual read" → "Quick visual read first" so the celebrity stage reads naturally whether it's the first thing the user sees (skip path) or follows dealbreakers (when flag is flipped back).
 - **Downstream caveats (not patched)** — celebrity + vignette generators get empty `dealbreaker_answers`, so pairs are unfiltered (mixed-gender / no religion/substance/kids filters). Matching pipeline's Stage 1 dealbreaker filter has no constraints for users onboarded this way. `tests/test_ideal_type_engine.py` will fail at `start()` until updated.
 
+## Phase 18: Name Collection + Persistence
+
+**What:** Capture the user's name as the first conversational step (a friend-style hello) and persist it to both `ideal_types` and `profiles`.
+
+- **New `collecting_name` stage** in `IdealTypeEngine`, runs before celebrity picks on the skip path. `start()` opens with a warm context + roadmap then asks "First — what's your name?"; `_handle_name` strips lead-ins ("I'm", "call me", "my name is"), detects refusals ("rather not", "no thanks"), caps length, and stores on `IdealTypeState.name`.
+- **Name-aware copy** — bridge after the name greets the user by name; `_finalize` closes with "Locked in, {name}.".
+- **Schema** — `supabase/migrations/00027_ideal_types_name.sql` adds `ideal_types.name TEXT`. `profiles.name` already existed (nullable since `00002`).
+- **Persistence** — `_handle_ideal_type` writes `state.name` to `ideal_types.name` (top-level column, not buried in `sub_state` JSONB) and mirrors it to `profiles.name` keyed by `profile_id`. Idempotent — every turn refreshes both once the name is set. `test_ideal_type_live.py` does the same at session end.
+
 ## Phase 17: Default Gender Preference on Skip Path
 
 **What:** With Stage 0 dealbreakers skipped, `dealbreaker_answers` was empty, making the celebrity + vignette generators produce mixed-gender content. Hard-default `gender_preference = ["male"]` when `SKIP_DEALBREAKERS=True` so both generators target a single gender until we have a real source of truth.

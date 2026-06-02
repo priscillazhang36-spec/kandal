@@ -295,6 +295,7 @@ def _handle_ideal_type(session, body: str) -> str:
         profile_id=UUID(str(session.profile_id)),
         messages=row.get("messages") or [],
         stage=row.get("stage") or "dealbreakers",
+        name=row.get("name"),
         dealbreaker_index=sub.get("dealbreaker_index", 0),
         dealbreaker_answers=sub.get("dealbreaker_answers") or {},
         celebrity_pairs=sub.get("celebrity_pairs") or [],
@@ -314,6 +315,7 @@ def _handle_ideal_type(session, body: str) -> str:
     update_data = {
         "messages": state.messages,
         "stage": state.stage,
+        "name": state.name,
         "vignettes": state.vignettes,
         "celebrity_choices": state.celebrity_choices,
         "sub_state": {
@@ -358,6 +360,13 @@ def _handle_ideal_type(session, body: str) -> str:
     client.table("ideal_types").update(update_data).eq(
         "id", str(session.conversation_id)
     ).execute()
+
+    # Mirror the name onto profiles so it's queryable alongside the rest of
+    # the user record. Idempotent — runs every turn once the name is set.
+    if state.name:
+        client.table("profiles").update({"name": state.name}).eq(
+            "id", str(session.profile_id)
+        ).execute()
 
     if turn.is_complete:
         session.state = "ideal_type_complete"

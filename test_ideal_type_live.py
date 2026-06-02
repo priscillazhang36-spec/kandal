@@ -67,6 +67,7 @@ def main():
             update = {
                 "messages": state.messages,
                 "stage": state.stage,
+                "name": state.name,
                 "vignettes": state.vignettes,
                 "celebrity_choices": state.celebrity_choices,
                 "vignette_choices": artifact.get("vignette_choices") or [],
@@ -93,6 +94,12 @@ def main():
 
             client.table("ideal_types").update(update).eq("id", row_id).execute()
             print("  ideal_types ✓")
+
+            if state.name:
+                client.table("profiles").update({"name": state.name}).eq(
+                    "id", str(profile_id)
+                ).execute()
+                print("  profiles.name ✓")
 
             stored = client.table("ideal_types").select("*").eq("id", row_id).execute()
             print("\n--- STORED ---")

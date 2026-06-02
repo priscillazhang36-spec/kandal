@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -62,9 +63,12 @@ _CONFIRM_YES = frozenset({
 class IdealTypeState:
     profile_id: UUID
     messages: list[dict] = field(default_factory=list)
-    # Stages: dealbreakers → celebrity_picks → freeform → vignettes →
-    # awaiting_confirmation → complete
+    # Stages: collecting_name (skip-path only) → dealbreakers → celebrity_picks
+    # → freeform → vignettes → awaiting_confirmation → complete
     stage: str = "dealbreakers"
+
+    # Captured during collecting_name. None if user declined or gave noise.
+    name: str | None = None
 
     # Stage 0
     dealbreaker_index: int = 0
@@ -125,23 +129,16 @@ class IdealTypeEngine:
             # mixed-gender content. Hard-default to male-attracted until we
             # have a real source of truth for gender preference.
             state.dealbreaker_answers["gender_preference"] = ["male"]
-            intro = (
-                "Hey — I'm Kandal :)\n\n"
-                "Different mode than the full thing. We're not building a "
-                "dating profile here — we're figuring out what you actually "
-                "want. Most people don't really know, or they know in "
-                "checklist form ('smart, funny, ambitious') that doesn't "
-                "actually predict who pulls them. We'll find your real "
-                "pattern.\n\n"
-                "Two parts: first a few quick visual picks, then we'll "
-                "talk through a past relationship that mattered. About 15 "
-                "minutes total — quick reactions are better than analysis."
+            state.stage = "collecting_name"
+            opening = (
+                "Hey :) I'm Kandal — your AI matchmaker.\n\n"
+                "I help people figure out what actually pulls them in a "
+                "partner — not the \"smart, funny, ambitious\" checklist "
+                "version, but the real pattern underneath. We'll find "
+                "yours together, takes about 15 minutes.\n\n"
+                "First — what's your name?"
             )
-            turn = self._start_celebrity_picks(state)
-            opening = f"{intro}\n\n{turn.reply}"
-            # _start_celebrity_picks already appended its reply — rewrite
-            # that last message so the transcript reflects the combined opening.
-            state.messages[-1]["content"] = opening
+            state.messages.append({"role": "assistant", "content": opening})
             return state, opening
 
         first_q, idx = db_mcqs.next_question(state.dealbreaker_answers, 0)
@@ -154,6 +151,8 @@ class IdealTypeEngine:
         """Process one user reply, return the next message + state changes."""
         state.messages.append({"role": "user", "content": user_reply})
 
+        if state.stage == "collecting_name":
+            return self._handle_name(state, user_reply)
         if state.stage == "dealbreakers":
             return self._handle_dealbreaker(state, user_reply)
         if state.stage == "celebrity_picks":
@@ -172,6 +171,50 @@ class IdealTypeEngine:
             stage=state.stage,
             artifact=state.pending_artifact,
         )
+
+    # --- Pre-Stage 0: collect the user's name (skip-path only) ---
+
+    def _handle_name(self, state: IdealTypeState, user_reply: str) -> IdealTypeTurn:
+        """Capture the user's name, then transition into celebrity picks."""
+        raw = user_reply.strip()
+        # Strip common lead-ins so "I'm Sarah" / "Call me Sarah" / "My name is Sarah"
+        # all reduce to "Sarah".
+        cleaned = re.sub(
+            r"^(i'?m|i am|my name'?s|my name is|name'?s|call me|it'?s|it is)\s+",
+            "",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        # Take the first chunk before punctuation, cap length to keep things sane.
+        first_chunk = re.split(r"[,.!?]", cleaned, 1)[0].strip()
+        candidate = first_chunk[:30]
+        # Detect refusals so the bot doesn't say "Nice to meet you, rather not say."
+        if not candidate or re.search(
+            r"\b(rather not|prefer not|don'?t want|no thanks?|skip)\b|^(no|nope|nah)$",
+            candidate,
+            re.IGNORECASE,
+        ):
+            state.name = None
+        else:
+            state.name = candidate
+
+        turn = self._start_celebrity_picks(state)
+
+        bridge_lead = (
+            f"Nice to meet you, {state.name} :)" if state.name
+            else "Nice to meet you :)"
+        )
+        bridge = (
+            f"{bridge_lead}\n\n"
+            "Here's how this goes: a few quick visual picks first, then "
+            "we'll talk through a past relationship that mattered. Quick "
+            "reactions are better than overthinking."
+        )
+        composed = f"{bridge}\n\n{turn.reply}"
+        # _start_celebrity_picks already appended turn.reply — rewrite the
+        # last message so the transcript reflects the combined response.
+        state.messages[-1]["content"] = composed
+        return IdealTypeTurn(reply=composed, stage=state.stage)
 
     # --- Stage 0: dealbreaker MCQ loop ---
 
@@ -436,8 +479,9 @@ class IdealTypeEngine:
         )
 
     def _finalize(self, state: IdealTypeState) -> IdealTypeTurn:
+        opener = f"Locked in, {state.name}." if state.name else "Locked in."
         closing = (
-            "Locked in. That's your pattern. You can come back and refine this "
+            f"{opener} That's your pattern. You can come back and refine this "
             "anytime — and whenever you're ready to actually start matching, "
             "let me know."
         )
