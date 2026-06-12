@@ -9,3 +9,7 @@ venv/
 *.egg
 .pytest_cache/
 .vercel
+
+# Cinder guest data — PII (names, photos, match shortlists). Lives in Supabase.
+/data/
+/cinder/data/

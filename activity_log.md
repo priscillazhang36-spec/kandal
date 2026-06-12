@@ -233,3 +233,20 @@
 - **SMS:** Twilio
 - **Hosting:** Vercel
 - **Testing:** pytest (70 tests)
+
+## Cinder (June 19 event) matching
+
+Standalone pipeline for the curated guest event (`cinder_profiles`: women × men),
+separate from the main matcher.
+
+| Component | Status |
+|---|---|
+| `cinder_profiles` landing table + ingestion (00028) | Complete |
+| Stage 1 baseline gate (age / dating-intent / kids + substance dealbreakers) | Complete — `scoring/cinder_baseline.py`, `cinder_prefs.py` |
+| Stage 2 spark judge (MBTI-heavy, priority-weighted, single scorer) | Complete — `scoring/cinder_judge.py` |
+| Deep ideal-type profiles (pull/break/icks) for linked women (00030 `profile_id`) | Complete — bridges `cinder_profiles` → `ideal_types` |
+| `cinder_matches` output table (00029) + per-woman top-N | Complete |
+| No-API in-session judging flow (`scripts/cinder_test.py`) | Complete — gather/load |
+| Tests | `tests/test_cinder_prefs.py`, `tests/test_cinder_judge.py` |
+
+Guest data (seeds, shortlist CSVs) is PII and stays in Supabase / out of git.
